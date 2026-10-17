@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-17
 **Owner:** Frankie Bisignano
-**Status:** Approved in conversation; pending written-spec review
+**Status:** Approved; implemented (see §10 for decisions made during the build)
 
 ## 1. Intent
 
@@ -76,12 +76,12 @@ define scroll length; the WebGL canvas is fixed behind them.
 
 ## 4. Architecture
 
-Stack: **Vite + TypeScript (strict) + Three.js + GSAP (ScrollTrigger) + Lenis +
+Stack: **Vite + TypeScript (strict) + Three.js + GSAP + Lenis +
 `postprocessing` (pmndrs)**. Vitest for unit tests. No framework.
 
 ### Data flow
 ```
-Lenis (smooth scroll) ──► ScrollTrigger ──► master GSAP timeline (scrubbed)
+Lenis (smooth scroll) ──► scroll position in vu ──► master GSAP timeline (paused; time = vu)
                                                │ tweens plain numbers on
                                                ▼
                                        Director state object
@@ -95,7 +95,8 @@ Lenis (smooth scroll) ──► ScrollTrigger ──► master GSAP timeline (sc
   registered system, then renders through the composer.
 - The scroll timeline only writes to the **Director state**; scene systems only
   read it. This keeps choreography in one place (`director/timeline.ts`).
-- DOM text reveals use per-section ScrollTriggers that call the scramble utility.
+- DOM copy is shown by beat windows (vu ranges) computed alongside the timeline;
+  entering a window toggles `is-active` and decodes `[data-scramble]` text.
 
 ### Module layout
 ```
@@ -117,7 +118,7 @@ src/
     timeline.ts           master scrubbed timeline (all choreography)
   scene/
     World.ts              scene graph, env map (PMREM RoomEnvironment), world swap
-    CameraRig.ts          keyframed Catmull-Rom path sampled by camT
+    CameraRig.ts          follow / parallax / shake / portrait framing on top of the timeline's camera keys
     Rocket.ts             procedural rocket (lathe hull, fins, nozzle, panels, decal)
     LaunchPad.ts          pad, gantry, floodlights, ground fog
     Exhaust.ts            stateless GPU particles + flame cone + smoke ring
@@ -183,3 +184,26 @@ for it is provided at handoff. Favicon is a minimal geometric SVG mark.
 - Pulling live data from the GitHub API.
 - WebGL-rendered UI text (DOM chosen for accessibility).
 - Recorded audio/music assets.
+
+## 10. Decisions made during implementation
+
+- **No ScrollTrigger.** The paused master timeline's time is set directly to the
+  scroll position in viewport units each frame. Every segment is an explicit
+  `fromTo`, so flings and nav jumps land on identical state (unit-tested).
+- **Camera keys instead of a spline.** Shots are keyframes tweened by the
+  timeline (easing per segment, so the camera settles on text beats).
+  `CameraRig` layers rocket-follow, parallax, thrust shake, a horizontal-only
+  portrait dolly and framing via `setViewOffset`.
+- **Fixed copy stages.** Each act's stage is `position: fixed`; visibility comes
+  only from beat windows. Sticky stages drifted out of sync with the camera in
+  the last viewport of each act.
+- **Baked noise.** Planet surface, clouds and the galactic band are rendered once
+  into equirectangular textures at load; ground fog and beam dust sample a
+  tileable CPU-generated noise texture. Per-pixel fractal noise in the orbit
+  shot was the dominant cost.
+- **In-world name.** The hero name is a WebGL plane between the rocket and the
+  tower (the rocket occludes it). Landscape: the rocket stands in the word gap.
+  Portrait: the words stack above the nose cone. A visually hidden `h1` carries
+  the name for assistive tech.
+- **Keyboard access.** All copy stays in the accessibility tree; focusing an
+  element in an inactive beat flies the scroll to that beat.

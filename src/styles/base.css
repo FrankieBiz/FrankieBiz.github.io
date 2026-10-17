@@ -1,0 +1,210 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+  background: var(--void);
+  color: var(--frost);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.is-locked {
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--t-body);
+  line-height: 1.55;
+  overflow-x: clip;
+}
+
+/* No rubber-band overscroll for mouse/trackpad; touch keeps pull-to-refresh. */
+@media (pointer: fine) {
+  html {
+    overscroll-behavior-y: none;
+  }
+}
+
+a,
+button {
+  touch-action: manipulation;
+}
+
+::selection {
+  background: var(--frost);
+  color: var(--void);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 1px solid var(--frost);
+  outline-offset: 5px;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+.gl {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+}
+
+/* Reduced-motion stand-in for the transition effect. */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: #dfe8f1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+main {
+  position: relative;
+  z-index: 2;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip {
+  position: fixed;
+  top: var(--edge-t);
+  left: 50%;
+  z-index: 40;
+  padding: 10px 14px;
+  background: var(--frost);
+  color: var(--void);
+  font-size: var(--t-small);
+  transform: translate(-50%, -200%);
+  transition: transform 0.3s var(--ease-out);
+}
+
+.skip:focus-visible {
+  transform: translate(-50%, 0);
+}
+
+.noscript {
+  position: relative;
+  z-index: 3;
+  padding: var(--edge);
+}
+
+/* Reticle cursor (fine pointers only, enabled from JS). */
+html.has-cursor,
+html.has-cursor * {
+  cursor: none !important;
+}
+
+.cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: difference;
+  transition: opacity 0.3s;
+}
+
+html.has-cursor .cursor.is-visible {
+  opacity: 1;
+}
+
+.cursor i {
+  position: absolute;
+  left: -20px;
+  top: -20px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  transform: scale(0.18);
+  transition: transform 0.45s var(--ease-out), opacity 0.3s;
+  opacity: 0.9;
+}
+
+.cursor::before,
+.cursor::after {
+  content: '';
+  position: absolute;
+  background: #fff;
+  transition: opacity 0.3s;
+}
+
+.cursor::before {
+  left: -11px;
+  top: 0;
+  width: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, #fff 0 36%, transparent 36% 64%, #fff 64%);
+}
+
+.cursor::after {
+  left: 0;
+  top: -11px;
+  width: 1px;
+  height: 22px;
+  background: linear-gradient(180deg, #fff 0 36%, transparent 36% 64%, #fff 64%);
+}
+
+.cursor.is-hover i {
+  transform: scale(1);
+}
+
+.cursor.is-hover::before,
+.cursor.is-hover::after {
+  opacity: 0;
+}
+
+.cursor.is-down i {
+  transform: scale(0.8);
+}

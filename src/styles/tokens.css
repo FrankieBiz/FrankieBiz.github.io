@@ -1,0 +1,34 @@
+:root {
+  /* Palette — cold, near-monochrome; ignition orange is reserved for flame and live states. */
+  --void: #05070b;
+  --night: #0a1220;
+  --frost: #e8eef5;
+  --steel: #8a97a8;
+  --hair: rgba(232, 238, 245, 0.14);
+  --ignite: #ff6a1a;
+
+  --font-display: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --edge: clamp(16px, 2.4vw, 40px);
+  /* Edges that respect notches, rounded corners and the home indicator. */
+  --edge-t: max(var(--edge), env(safe-area-inset-top));
+  --edge-r: max(var(--edge), env(safe-area-inset-right));
+  --edge-b: max(var(--edge), env(safe-area-inset-bottom));
+  --edge-l: max(var(--edge), env(safe-area-inset-left));
+  --hud-h: 56px;
+
+  /* Type scale (≈ 1.333, fluid at the top end). */
+  --t-hud: 11px;
+  --t-small: 12px;
+  --t-body: 14px;
+  --t-lead: clamp(15px, 1.15vw, 17px);
+  --t-h3: clamp(32px, 3.6vw, 58px);
+  --t-h2: clamp(30px, 3.8vw, 60px);
+  --t-statement: clamp(26px, 3.1vw, 50px);
+  --t-caption: clamp(36px, 6vw, 104px);
+  --t-channel: clamp(28px, 3.4vw, 54px);
+}

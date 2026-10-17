@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Frankie Bisignano</title>
+    <meta name="description" content="Frankie Bisignano — software engineer. Projects, experiments and open-source work." />
+    <meta name="theme-color" content="#05070b" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Frankie Bisignano" />
+    <meta property="og:description" content="Projects, experiments and open-source work." />
+    <meta property="og:image" content="./og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <canvas class="gl" aria-hidden="true"></canvas>
+    <div class="veil" aria-hidden="true"></div>
+
+    <div class="loader">
+      <div class="loader__head">
+        <span class="loader__mark" translate="no">FB-01</span>
+        <span class="loader__status" role="status" aria-live="polite">Pre-flight check…</span>
+      </div>
+      <ul class="loader__list" aria-hidden="true">
+        <li class="loader__item"><span>Guidance</span><span class="loader__state">Hold</span></li>
+        <li class="loader__item"><span>Telemetry</span><span class="loader__state">Hold</span></li>
+        <li class="loader__item"><span>Propulsion</span><span class="loader__state">Hold</span></li>
+        <li class="loader__item"><span>Payload</span><span class="loader__state">Hold</span></li>
+        <li class="loader__item"><span>Range safety</span><span class="loader__state">Hold</span></li>
+      </ul>
+      <div class="loader__count" aria-hidden="true">000</div>
+    </div>
+
+    <a class="skip" href="#payloads">Skip to projects</a>
+
+    <header class="hud hud--top">
+      <a class="hud__mark" href="#pad" data-nav-to="pad">
+        <span class="hud__callsign" translate="no">FB-01</span>
+        <span class="hud__name" translate="no">Frankie Bisignano</span>
+        <span class="sr-only">, back to the launch pad</span>
+      </a>
+      <nav class="hud__nav" aria-label="Sections">
+        <a href="#manifesto" data-nav="manifesto" data-nav-to="manifesto">Manifesto</a>
+        <a href="#payloads" data-nav="payloads" data-nav-to="payloads">Payloads</a>
+        <a href="#contact" data-nav="contact" data-nav-to="contact">Contact</a>
+        <button class="sound" type="button" aria-pressed="false" data-cursor>
+          <span class="sound__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="sound__label">Sound off</span>
+        </button>
+      </nav>
+    </header>
+
+    <div class="hud hud--bottom" aria-hidden="true">
+      <dl class="hud__telemetry">
+        <div><dt>ALT</dt><dd data-telemetry="alt">000.0&nbsp;km</dd></div>
+        <div><dt>VEL</dt><dd data-telemetry="vel">0000&nbsp;m/s</dd></div>
+        <div><dt>MET</dt><dd data-telemetry="clock">T−00:10:00</dd></div>
+      </dl>
+      <div class="hud__act">
+        <span class="hud__act-index">01 / 05</span>
+        <span class="hud__act-label">Pad</span>
+        <span class="hud__rail"><i class="hud__rail-fill"></i></span>
+      </div>
+    </div>
+
+    <div class="cursor" aria-hidden="true"><i></i></div>
+
+    <main id="mission"></main>
+
+    <noscript>
+      <p class="noscript">Frankie Bisignano — this site needs JavaScript for its launch sequence.</p>
+    </noscript>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
