@@ -8,6 +8,9 @@ import './styles/loader.css'
 import './styles/sections.css'
 
 import gsap from 'gsap'
+import { createDecoder } from './assets/decoders'
+import { loadAssets } from './assets/load'
+import { EMPTY_MANIFEST, selectTier, validateManifest, type AssetManifest } from './assets/manifest'
 import { MAX_PROJECTS, projects as allProjects, validateProjects } from './content/projects'
 import { site, type ShapeId } from './content/site'
 import { Audio } from './core/Audio'
@@ -40,6 +43,23 @@ async function loadFonts() {
     document.fonts.load('400 14px "Geist Mono Variable"'),
   ])
   await Promise.race([fonts, new Promise((r) => setTimeout(r, 3000))])
+}
+
+/** The build writes assets/manifest.json; a missing or invalid one means "no assets". */
+async function fetchManifest(): Promise<AssetManifest> {
+  try {
+    const response = await fetch('assets/manifest.json', { cache: 'no-cache' })
+    if (!response.ok) return EMPTY_MANIFEST
+    const manifest = (await response.json()) as AssetManifest
+    const problems = validateManifest(manifest)
+    if (problems.length) {
+      console.warn('[assets] manifest rejected:', problems.join('; '))
+      return EMPTY_MANIFEST
+    }
+    return manifest
+  } catch {
+    return EMPTY_MANIFEST
+  }
 }
 
 async function boot() {
@@ -170,7 +190,16 @@ async function boot() {
   let post: PostFX
   try {
     await loadFonts()
-    loader.progress = 0.15
+    loader.progress = 0.1
+
+    // Authored assets (models, textures, environments). Any required failure
+    // keeps the procedural scene, so a bad network never blanks the site.
+    const manifest = await fetchManifest()
+    const loaded = await loadAssets(selectTier(manifest, quality.budget.tier), {
+      decode: createDecoder(),
+      onProgress: (p) => (loader.progress = 0.1 + p * 0.4),
+    })
+    if (!loaded.ok) console.warn(`[assets] unavailable (${loaded.failed.join(', ')}); using the procedural scene.`)
     await nextFrame()
 
     const canvas = document.querySelector<HTMLCanvasElement>('canvas.gl')!
@@ -181,11 +210,11 @@ async function boot() {
       sessionStorage.setItem(RESUME_KEY, String(scroll.vu))
       location.reload()
     })
-    loader.progress = 0.25
+    loader.progress = 0.55
     await nextFrame()
 
     world = new World(renderer.gl, quality, projects, site.name)
-    loader.progress = 0.55
+    loader.progress = 0.7
     await nextFrame()
 
     post = new PostFX(renderer.gl, world.scene, world.rig.camera, quality.budget)
@@ -205,7 +234,7 @@ async function boot() {
     } catch (err) {
       console.warn('Shader pre-compilation failed; continuing.', err)
     }
-    loader.progress = 0.8
+    loader.progress = 0.85
     await nextFrame()
     const warmups: Array<Partial<typeof state>> = [
       { warp: 1, assemble: 1 },

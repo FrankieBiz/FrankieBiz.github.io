@@ -221,6 +221,26 @@ if (axePath && existsSync(axePath)) {
 
 check('no console errors during the session', problems.length === 0, [...new Set(problems)].join(' || '))
 
+// ------------------------------------------------- assets blocked → fallback
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const p = await ctx.newPage()
+  const errors = []
+  p.on('pageerror', (e) => errors.push(e.message))
+  // Chromium logs every deliberately aborted request; those are expected here.
+  p.on('console', (m) => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && errors.push(m.text()))
+  // Block only the shipped asset folder (/assets/…), not source modules under /src/assets/.
+  await p.route((url) => url.pathname.startsWith('/assets/'), (route) => route.abort())
+  await p.goto(`${base}?quality=low`, { waitUntil: 'domcontentloaded' })
+  const booted = await p
+    .waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 120000 })
+    .then(() => true)
+    .catch(() => false)
+  const webgl = await p.evaluate(() => document.documentElement.classList.contains('webgl'))
+  check('assets blocked → procedural scene still boots', booted && webgl && errors.length === 0, `booted=${booted} webgl=${webgl} ${errors.join(' || ')}`)
+  await ctx.close()
+}
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
 await browser.close()
