@@ -1,7 +1,6 @@
 import {
   BlendFunction,
   BloomEffect,
-  DepthOfFieldEffect,
   EffectComposer,
   EffectPass,
   GodRaysEffect,
@@ -20,6 +19,7 @@ import { Color, HalfFloatType, Vector3, type Camera, type Mesh, type Scene, type
 import type { QualityBudget } from '../core/Quality'
 import { LensDirtEffect, StreakPass, type GradeAssets } from './Grade'
 import { LensEffect } from './LensEffect'
+import { ScaledDepthOfField } from './ScaledDepthOfField'
 
 /**
  * Two merged passes: [bloom → ACES tone mapping] in HDR, then
@@ -42,7 +42,7 @@ export class PostFX {
   readonly lens: LensEffect
   private renderPass: RenderPass
   private aoPass: N8AOPostPass | null = null
-  private dof: DepthOfFieldEffect | null = null
+  private dof: ScaledDepthOfField | null = null
   private dofPass: EffectPass | null = null
   private maxBokeh: number
   private shafts: GodRaysEffect | null = null
@@ -61,7 +61,11 @@ export class PostFX {
     if (ao) {
       this.aoPass = new AOPass!(scene, camera, innerWidth, innerHeight)
       this.aoPass.setQualityMode(budget.ao === 'full' ? 'Medium' : 'Low')
+      // Transparency awareness re-renders every transparent object (all the smoke) into two
+      // full-res targets each frame: 6–10 ms at ignition on an iGPU, for a barely visible gain.
+      this.aoPass.autoDetectTransparency = false
       Object.assign(this.aoPass.configuration, {
+        transparencyAware: false,
         aoRadius: 1.6,
         distanceFalloff: 1.2,
         intensity: 2.2,
@@ -75,7 +79,7 @@ export class PostFX {
     // Depth of field runs on the HDR image before bloom, so out-of-focus highlights bloom naturally.
     this.maxBokeh = budget.tier === 'high' ? 2.6 : 1.8
     if (options.depthOfField && budget.tier !== 'low') {
-      this.dof = new DepthOfFieldEffect(camera, { focusDistance: 10, focusRange: 4, bokehScale: 0, resolutionScale: budget.tier === 'high' ? 0.75 : 0.5 })
+      this.dof = new ScaledDepthOfField(camera, { focusDistance: 10, focusRange: 4, bokehScale: 0, resolutionScale: budget.tier === 'high' ? 0.75 : 0.5 })
       this.dof.target = new Vector3()
       this.dofPass = new EffectPass(camera, this.dof)
       this.dofPass.enabled = false
@@ -133,6 +137,11 @@ export class PostFX {
       this.aaPass = new EffectPass(camera, new SMAAEffect())
       this.composer.addPass(this.aaPass)
     }
+  }
+
+  /** Ambient occlusion on/off; SMAA keeps anti-aliasing either way. */
+  setOcclusion(enabled: boolean) {
+    if (this.aoPass) this.aoPass.enabled = enabled
   }
 
   /** Turn the engine light shafts on/off and scale them with thrust. */

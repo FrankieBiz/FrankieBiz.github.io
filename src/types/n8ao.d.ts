@@ -22,6 +22,8 @@ declare module 'n8ao' {
   export class N8AOPostPass extends Pass {
     constructor(scene: Scene, camera: Camera, width?: number, height?: number)
     configuration: N8AOConfiguration
+    /** Re-enables transparencyAware whenever the scene holds a transparent material. */
+    autoDetectTransparency: boolean
     setQualityMode(mode: 'Performance' | 'Low' | 'Medium' | 'High' | 'Ultra'): void
     setSize(width: number, height: number): void
   }

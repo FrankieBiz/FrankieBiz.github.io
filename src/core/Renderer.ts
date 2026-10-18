@@ -32,6 +32,7 @@ export class Renderer {
     this.gl.info.autoReset = false
     this.gl.shadowMap.enabled = budget.shadows
     this.gl.shadowMap.type = PCFShadowMap
+    if (budget.transmission > 0) this.gl.transmissionResolutionScale = budget.transmission
     this.pixelRatio = Math.min(devicePixelRatio, budget.dprCap)
     this.gl.setPixelRatio(this.pixelRatio)
     this.gl.setSize(this.width, this.height, false)

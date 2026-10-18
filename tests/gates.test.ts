@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { heatIntensity, shaftsEnabled } from '../src/post/gates'
+import { heatIntensity, occlusionEnabled, shaftsEnabled } from '../src/post/gates'
 
 describe('engine effect gates', () => {
   const base = { ignition: 1, orbit: false, reduced: false, tier: 'high' as const }
@@ -22,5 +22,12 @@ describe('engine effect gates', () => {
     expect(shaftsEnabled({ ...base, tier: 'low' })).toBe(false)
     // Shafts are light, not motion: they stay under reduced motion.
     expect(shaftsEnabled({ ...base, reduced: true })).toBe(true)
+  })
+})
+
+describe('ambient occlusion gate', () => {
+  it('runs on the pad, where structures meet the ground, and not in orbit', () => {
+    expect(occlusionEnabled({ orbit: false })).toBe(true)
+    expect(occlusionEnabled({ orbit: true })).toBe(false)
   })
 })

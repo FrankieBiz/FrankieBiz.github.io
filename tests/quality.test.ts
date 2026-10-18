@@ -33,6 +33,14 @@ describe('quality tier selection', () => {
     expect(BUDGETS.low.ao).toBe('off')
   })
 
+  it('renders glass refraction at full res on high, half on medium, not at all on low', () => {
+    // The transmission pass re-renders the scene behind glass; half res is invisible through dark glass
+    // and keeps medium inside its frame budget on an iGPU (scripts/qa-gpu.mjs).
+    expect(BUDGETS.high.transmission).toBe(1)
+    expect(BUDGETS.medium.transmission).toBe(0.5)
+    expect(BUDGETS.low.transmission).toBe(0)
+  })
+
   it('budgets shrink monotonically from high to low', () => {
     for (const key of ['contact', 'stars', 'smoke', 'trail', 'dprCap'] as const) {
       expect(BUDGETS.high[key]).toBeGreaterThan(BUDGETS.medium[key])

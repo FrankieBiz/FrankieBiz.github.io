@@ -48,7 +48,7 @@ export class Payloads {
   private chrome: MeshPhysicalMaterial
 
   constructor(projects: readonly Project[], budget: QualityBudget) {
-    const glass = budget.transmission
+    const glass = budget.transmission > 0
       ? new MeshPhysicalMaterial({
           color: '#ffffff',
           transmission: 1,

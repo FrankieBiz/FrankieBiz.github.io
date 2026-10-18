@@ -17,3 +17,8 @@ export function heatIntensity({ ignition, orbit, reduced, tier }: EngineEffectIn
 export function shaftsEnabled({ ignition, orbit, tier }: Omit<EngineEffectInputs, 'reduced'> & { reduced?: boolean }): boolean {
   return ignition > 0.02 && !orbit && tier !== 'low'
 }
+
+/** Ambient occlusion: the pad only, where structures meet the ground. In orbit there is nothing to occlude against, and it is a quarter of the medium frame. */
+export function occlusionEnabled({ orbit }: { orbit: boolean }): boolean {
+  return !orbit
+}

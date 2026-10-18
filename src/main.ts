@@ -22,7 +22,7 @@ import { Scroll } from './core/Scroll'
 import { layoutActs, type ActId } from './director/acts'
 import { createState, warpIntensity } from './director/state'
 import { buildTimeline, computeBeats, keyTimes } from './director/timeline'
-import { heatIntensity, shaftsEnabled } from './post/gates'
+import { heatIntensity, occlusionEnabled, shaftsEnabled } from './post/gates'
 import { gradeAssets } from './post/Grade'
 import { PostFX } from './post/PostFX'
 import { World } from './scene/World'
@@ -300,6 +300,7 @@ async function boot() {
     post.lens.setHeat(heat > 0 && world.flameScreenSegment(heatA, heatB) ? heat : 0, heatA, heatB)
     // Shafts need smoke to scatter off: full in the pad plume, faint once the camera tracks the climb.
     post.setShafts(shaftsEnabled({ ignition: state.ignition, orbit, tier }), state.ignition * (1 - state.follow * 0.85))
+    post.setOcclusion(occlusionEnabled({ orbit }))
     const warp = warpIntensity(state.warp)
     post.lens.amount = reduced ? 0 : Math.max(intro.amount, warp)
     veil.style.opacity = reduced ? String(warp) : '0'
