@@ -19,6 +19,7 @@ import { Color, HalfFloatType, Vector3, type Camera, type Mesh, type Scene, type
 import type { QualityBudget } from '../core/Quality'
 import { LensDirtEffect, StreakPass, type GradeAssets } from './Grade'
 import { LensEffect } from './LensEffect'
+import { guardBloomInput } from './nanGuard'
 import { ScaledDepthOfField } from './ScaledDepthOfField'
 
 /**
@@ -116,6 +117,7 @@ export class PostFX {
             radius: 0.78,
             resolutionScale: budget.bloom === 'half' ? 0.5 : 1,
           })
+    if (bloom && !guardBloomInput(bloom) && import.meta.env.DEV) console.warn('Bloom NaN guard did not apply: postprocessing changed its luminance shader')
     this.bloomPass = new EffectPass(camera, ...(bloom ? [bloom, tone] : [tone]))
     this.composer.addPass(this.bloomPass)
     // Anamorphic streaks (high tier): blurred from the bloom between the two effect passes.
