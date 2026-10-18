@@ -19,6 +19,7 @@ import { Pointer } from './core/Pointer'
 import { detectQuality, webglAvailable } from './core/Quality'
 import { Renderer } from './core/Renderer'
 import { Scroll } from './core/Scroll'
+import { within } from './core/within'
 import { layoutActs, type ActId } from './director/acts'
 import { createState, warpIntensity } from './director/state'
 import { buildTimeline, computeBeats, keyTimes } from './director/timeline'
@@ -34,6 +35,8 @@ import { Sections } from './ui/Sections'
 
 /** Scroll position saved across a reload after the GPU context is restored. */
 const RESUME_KEY = 'fb:resume-vu'
+/** Longest wait for an optional lazy chunk before carrying on without it. */
+const CHUNK_TIMEOUT = 15000
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
 
@@ -47,10 +50,12 @@ async function loadFonts() {
   await Promise.race([fonts, new Promise((r) => setTimeout(r, 3000))])
 }
 
-/** The build writes assets/manifest.json; a missing or invalid one means "no assets". */
+/** The build writes assets/manifest.json; a missing, invalid or stalled one means "no assets". */
 async function fetchManifest(): Promise<AssetManifest> {
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), 8000)
   try {
-    const response = await fetch('assets/manifest.json', { cache: 'no-cache' })
+    const response = await fetch('assets/manifest.json', { cache: 'no-cache', signal: abort.signal })
     const isJson = response.headers.get('content-type')?.includes('json')
     if (!response.ok || !isJson) {
       if (import.meta.env.DEV) console.info('[assets] no manifest served; using the procedural scene. Run `npm run assets`.')
@@ -65,6 +70,8 @@ async function fetchManifest(): Promise<AssetManifest> {
     return manifest
   } catch {
     return EMPTY_MANIFEST
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -201,15 +208,15 @@ async function boot() {
     // Authored assets (models, textures, environments). Any required failure
     // keeps the procedural scene, so a bad network never blanks the site.
     const manifest = await fetchManifest()
-    // Loaders (glTF, HDR, LUT) and the AO pass are separate chunks, fetched only when needed.
-    const { createDecoder } = await import('./assets/decoders')
-    const aoModule = quality.budget.ao !== 'off' ? import('n8ao').catch(() => null) : Promise.resolve(null)
-    // Pad atmosphere (fog banks, sparks), in parallel with the assets; optional.
-    const padEffectsModule = import('./scene/padEffects').catch(() => null)
-    const loaded = await loadAssets(selectTier(manifest, quality.budget.tier), {
-      decode: createDecoder(),
-      onProgress: (p) => (loader.progress = 0.1 + p * 0.4),
-    })
+    // Loaders (glTF, HDR, LUT), the AO pass and the pad atmosphere are separate chunks, fetched only
+    // when needed. Each is optional: a failed or stalled chunk means the procedural version, never a hang.
+    const aoModule = quality.budget.ao !== 'off' ? within(import('n8ao'), CHUNK_TIMEOUT, null) : Promise.resolve(null)
+    const padEffectsModule = within(import('./scene/padEffects'), CHUNK_TIMEOUT, null)
+    const items = selectTier(manifest, quality.budget.tier)
+    const decoders = items.length ? await within(import('./assets/decoders'), CHUNK_TIMEOUT, null) : null
+    const loaded = decoders
+      ? await loadAssets(items, { decode: decoders.createDecoder(), onProgress: (p) => (loader.progress = 0.1 + p * 0.4) })
+      : { ok: items.length === 0, assets: new Map<string, unknown>(), failed: items.length ? ['decoders'] : [] }
     if (!loaded.ok) console.warn(`[assets] unavailable (${loaded.failed.join(', ')}); using the procedural scene.`)
     await nextFrame()
 

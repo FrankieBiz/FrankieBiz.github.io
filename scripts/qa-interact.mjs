@@ -241,6 +241,25 @@ check('no console errors during the session', problems.length === 0, [...new Set
   await ctx.close()
 }
 
+// ------------------------------- decoder chunk blocked → procedural 3D, not static
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const p = await ctx.newPage()
+  const errors = []
+  p.on('pageerror', (e) => errors.push(e.message))
+  p.on('console', (m) => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && errors.push(m.text()))
+  // Dev serves the module from /src/assets/decoders.ts; a build ships it as /assets/decoders-<hash>.js.
+  await p.route((url) => /\/(src\/assets\/decoders\.ts|assets\/decoders-[\w-]+\.js)/.test(url.pathname), (route) => route.abort())
+  await p.goto(`${base}?quality=low`, { waitUntil: 'domcontentloaded' })
+  const booted = await p
+    .waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 120000 })
+    .then(() => true)
+    .catch(() => false)
+  const webgl = await p.evaluate(() => document.documentElement.classList.contains('webgl'))
+  check('decoder chunk blocked → procedural 3D scene still boots', booted && webgl && errors.length === 0, `booted=${booted} webgl=${webgl} ${errors.join(' || ')}`)
+  await ctx.close()
+}
+
 // ------------------------------------------- slow network → loader completes
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
@@ -286,7 +305,8 @@ const boot = async (url, options = {}) => {
   const p = await ctx.newPage()
   await p.goto(url, { waitUntil: 'domcontentloaded' })
   const ready = await p
-    .waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 120000 })
+    // Software GL compiles every warmed-up pass on the CPU; allow it time.
+    .waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 240000 })
     .then(() => true)
     .catch(() => false)
   return { ctx, p, ready }
@@ -296,7 +316,8 @@ const renderedFrames = (p, n) =>
 
 // ------------------------------------- reduced motion → no depth of field, no shimmer
 {
-  const { ctx, p, ready } = await boot(`${base}?debug&quality=high`, { reducedMotion: 'reduce' })
+  // Medium has depth of field and shimmer like high, and boots faster under software GL.
+  const { ctx, p, ready } = await boot(`${base}?debug&quality=medium`, { reducedMotion: 'reduce' })
   let detail = `ready=${ready}`
   let ok = ready
   if (ready) {
