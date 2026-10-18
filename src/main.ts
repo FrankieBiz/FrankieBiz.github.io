@@ -8,7 +8,6 @@ import './styles/loader.css'
 import './styles/sections.css'
 
 import gsap from 'gsap'
-import { createDecoder } from './assets/decoders'
 import { loadAssets } from './assets/load'
 import { EMPTY_MANIFEST, selectTier, validateManifest, type AssetManifest } from './assets/manifest'
 import { MAX_PROJECTS, projects as allProjects, validateProjects } from './content/projects'
@@ -200,6 +199,9 @@ async function boot() {
     // Authored assets (models, textures, environments). Any required failure
     // keeps the procedural scene, so a bad network never blanks the site.
     const manifest = await fetchManifest()
+    // Loaders (glTF, HDR, LUT) and the AO pass are separate chunks, fetched only when needed.
+    const { createDecoder } = await import('./assets/decoders')
+    const aoModule = quality.budget.ao !== 'off' ? import('n8ao').catch(() => null) : Promise.resolve(null)
     const loaded = await loadAssets(selectTier(manifest, quality.budget.tier), {
       decode: createDecoder(),
       onProgress: (p) => (loader.progress = 0.1 + p * 0.4),
@@ -222,7 +224,8 @@ async function boot() {
     loader.progress = 0.7
     await nextFrame()
 
-    post = new PostFX(renderer.gl, world.scene, world.rig.camera, quality.budget, gradeAssets(loaded.ok ? loaded.assets : new Map()))
+    const AOPass = (await aoModule)?.N8AOPostPass
+    post = new PostFX(renderer.gl, world.scene, world.rig.camera, quality.budget, gradeAssets(loaded.ok ? loaded.assets : new Map()), AOPass)
     const r = renderer
     const w = world
     const p = post

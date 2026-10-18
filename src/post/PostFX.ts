@@ -12,7 +12,7 @@ import {
   VignetteEffect,
   type Effect,
 } from 'postprocessing'
-import { N8AOPostPass } from 'n8ao'
+import type { N8AOPostPass } from 'n8ao'
 import { Color, HalfFloatType, type Camera, type Scene, type WebGLRenderer } from 'three'
 import type { QualityBudget } from '../core/Quality'
 import { LensDirtEffect, StreakPass, type GradeAssets } from './Grade'
@@ -33,14 +33,25 @@ export class PostFX {
   private finishPass: EffectPass
   private aaPass: EffectPass | null = null
 
-  constructor(renderer: WebGLRenderer, scene: Scene, camera: Camera, budget: QualityBudget, grade: GradeAssets = {}) {
+  /**
+   * `AOPass` is the lazily imported N8AO pass class (only fetched on tiers that
+   * use ambient occlusion); without it AO stays off and MSAA stays on.
+   */
+  constructor(
+    renderer: WebGLRenderer,
+    scene: Scene,
+    camera: Camera,
+    budget: QualityBudget,
+    grade: GradeAssets = {},
+    AOPass?: typeof N8AOPostPass,
+  ) {
     // Ambient occlusion can't read multisampled depth, so AO tiers swap MSAA for SMAA.
-    const ao = budget.ao !== 'off'
+    const ao = budget.ao !== 'off' && AOPass !== undefined
     this.composer = new EffectComposer(renderer, { frameBufferType: HalfFloatType, multisampling: ao ? 0 : budget.msaa })
     this.renderPass = new RenderPass(scene, camera)
     this.composer.addPass(this.renderPass)
     if (ao) {
-      this.aoPass = new N8AOPostPass(scene, camera, innerWidth, innerHeight)
+      this.aoPass = new AOPass!(scene, camera, innerWidth, innerHeight)
       this.aoPass.setQualityMode(budget.ao === 'full' ? 'Medium' : 'Low')
       Object.assign(this.aoPass.configuration, {
         aoRadius: 1.6,
