@@ -204,6 +204,8 @@ async function boot() {
     // Loaders (glTF, HDR, LUT) and the AO pass are separate chunks, fetched only when needed.
     const { createDecoder } = await import('./assets/decoders')
     const aoModule = quality.budget.ao !== 'off' ? import('n8ao').catch(() => null) : Promise.resolve(null)
+    // Pad atmosphere (fog banks, sparks), in parallel with the assets; optional.
+    const padEffectsModule = import('./scene/padEffects').catch(() => null)
     const loaded = await loadAssets(selectTier(manifest, quality.budget.tier), {
       decode: createDecoder(),
       onProgress: (p) => (loader.progress = 0.1 + p * 0.4),
@@ -222,7 +224,7 @@ async function boot() {
     loader.progress = 0.55
     await nextFrame()
 
-    world = new World(renderer.gl, quality, projects, site.name, loaded.ok ? loaded.assets : new Map())
+    world = new World(renderer.gl, quality, projects, site.name, loaded.ok ? loaded.assets : new Map(), await padEffectsModule)
     loader.progress = 0.7
     await nextFrame()
 

@@ -27,6 +27,8 @@ import type { Quality } from '../core/Quality'
 import { worldForWarp, type DirectorState } from '../director/state'
 import { CameraRig } from './CameraRig'
 import { Exhaust } from './Exhaust'
+import type { GroundFog } from './GroundFog'
+import type { Sparks } from './Sparks'
 import { createFloodLensMaterial, LaunchPad } from './LaunchPad'
 import { fieldPosition, ORBIT_ROCKET, PAD_ROCKET_Y } from './layout'
 import { NamePlate } from './NamePlate'
@@ -85,6 +87,9 @@ export class World {
   readonly rocket: RocketLike
   readonly launchPad: LaunchPad
   readonly exhaust: Exhaust
+  /** Floodlit fog banks; only with the smoke flipbook (the flat fog layers remain either way). */
+  readonly groundFog: GroundFog | null
+  readonly sparks: Sparks | null
   readonly sky: Sky
   readonly planet: Planet
   readonly payloads: Payloads
@@ -112,6 +117,8 @@ export class World {
     projects: readonly Project[],
     name: { first: string; last: string },
     assets: Map<string, unknown> = new Map(),
+    /** Lazily loaded pad atmosphere (scene/padEffects.ts); null runs without it. */
+    padEffects: typeof import('./padEffects') | null = null,
   ) {
     const { budget } = quality
     const bakeWidth = budget.tier === 'low' ? 1024 : 2048
@@ -147,9 +154,14 @@ export class World {
     const contactShadows = structures ? ((assets.get('ground-ao') as Texture | undefined) ?? null) : null
     this.launchPad = new LaunchPad(createPadTexture(contactShadows), noise, budget.shadows, structures)
     this.pad.add(this.launchPad.group)
-    this.exhaust = new Exhaust(budget, createPuffTexture(), (assets.get('smoke-atlas') as Texture | undefined) ?? null)
+    const smokeAtlas = (assets.get('smoke-atlas') as Texture | undefined) ?? null
+    this.exhaust = new Exhaust(budget, createPuffTexture(), smokeAtlas)
     this.rocket.nozzle.add(this.exhaust.flame)
     this.pad.add(this.exhaust.world)
+    this.groundFog = padEffects && smokeAtlas && budget.groundFog > 0 ? new padEffects.GroundFog(budget.groundFog, smokeAtlas) : null
+    if (this.groundFog) this.pad.add(this.groundFog.points)
+    this.sparks = padEffects && budget.sparks > 0 ? new padEffects.Sparks(budget.sparks) : null
+    if (this.sparks) this.pad.add(this.sparks.lines)
     this.name = new NamePlate(name.first, name.last)
     this.pad.add(this.name.mesh)
 
@@ -197,8 +209,10 @@ export class World {
     this.rig.resize(width, height)
     this.name.layout(width / height, 21 * (width / height < 1 ? 1 + (1 - width / height) * 0.95 : 1), 34)
     this.exhaust.setProjection(height, 38, dpr)
+    this.groundFog?.setProjection(height, 38, dpr)
     this.field.setProjection(height, 34, dpr)
     this.launchPad.setPixelRatio(dpr)
+    this.launchPad.setProjection(height, 38, dpr)
     this.sky.setPixelRatio(dpr)
   }
 
@@ -239,6 +253,10 @@ export class World {
       this.rocket.group.updateMatrixWorld()
       this.rocket.nozzle.getWorldPosition(this.nozzle)
       this.exhaust.update(dt, time, state, this.nozzle, state.altitude)
+      this.groundFog?.update(time, state.ignition)
+      // Sparks off the pad: with the engine, gone once the rocket has cleared the tower.
+      const cleared = Math.min(Math.max((state.altitude - 4) / 26, 0), 1)
+      this.sparks?.update(time, state.ignition * (1 - cleared * cleared * (3 - 2 * cleared)))
       this.launchPad.update(dt, time, state)
       this.name.setOpacity(state.hero)
       this.sky.horizonColor(state.sky, this.fogColor)

@@ -42,7 +42,7 @@ describe('quality tier selection', () => {
   })
 
   it('budgets shrink monotonically from high to low', () => {
-    for (const key of ['contact', 'stars', 'smoke', 'trail', 'dprCap'] as const) {
+    for (const key of ['contact', 'stars', 'smoke', 'trail', 'groundFog', 'sparks', 'dprCap'] as const) {
       expect(BUDGETS.high[key]).toBeGreaterThan(BUDGETS.medium[key])
       expect(BUDGETS.medium[key]).toBeGreaterThan(BUDGETS.low[key])
     }

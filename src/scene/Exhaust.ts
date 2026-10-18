@@ -382,13 +382,15 @@ void main() {
   smoke.rgb *= smoothstep(0.0, 0.03, smoke.a);
   float a = smoke.a * vAlpha * 0.55;
   if (a < 0.002) discard;
-  float near = exp(-length(vWorld - vec3(0.0, 1.0, -0.4)) * 0.42);
+  float near = exp(-length(vWorld - vec3(0.0, 0.9, -0.5)) * 0.48);
   float young = 1.0 - smoothstep(0.0, 0.12, vAge);
-  float glow = uIgnition * (near * 1.1 + young * 0.6);
+  float glow = uIgnition * (near * 1.3 + young * near * 0.8);
   float height = clamp(vWorld.y / 12.0, 0.0, 1.0);
+  // Fire inside the steam: yellow-white at the heart, orange further out, lit from below.
+  vec3 fire = mix(uGlow, vec3(1.0, 0.72, 0.4), near * near);
   vec3 col = uDark * smoke.a * 1.4
     + uLit * (smoke.r * (0.55 + height * 0.6) + smoke.b * 0.3)
-    + uGlow * smoke.g * glow * 2.4;
+    + fire * smoke.g * glow * 3.2;
   gl_FragColor = vec4(col * vAlpha * 0.55, a);
 }
 `

@@ -6,6 +6,10 @@ export interface QualityBudget {
   dprMin: number
   smoke: number
   trail: number
+  /** Floodlit fog banks on the pad (sprites from the smoke flipbook). */
+  groundFog: number
+  /** Sparks thrown off the pad at ignition. */
+  sparks: number
   contact: number
   stars: number
   /** Render scale of the refraction pass behind glass (three's transmissionResolutionScale); 0 = frosted, no transmission. */
@@ -18,9 +22,9 @@ export interface QualityBudget {
 }
 
 export const BUDGETS: Record<Tier, Omit<QualityBudget, 'tier'>> = {
-  high: { dprCap: 1.75, dprMin: 1, smoke: 1400, trail: 4600, contact: 20000, stars: 6000, transmission: 1, bloom: 'full', ao: 'full', msaa: 4, shadows: true },
-  medium: { dprCap: 1.5, dprMin: 0.85, smoke: 1000, trail: 3000, contact: 14000, stars: 4000, transmission: 0.5, bloom: 'half', ao: 'half', msaa: 2, shadows: true },
-  low: { dprCap: 1.25, dprMin: 0.75, smoke: 420, trail: 1100, contact: 6000, stars: 2000, transmission: 0, bloom: 'off', ao: 'off', msaa: 0, shadows: false },
+  high: { dprCap: 1.75, dprMin: 1, smoke: 1400, trail: 4600, groundFog: 64, sparks: 380, contact: 20000, stars: 6000, transmission: 1, bloom: 'full', ao: 'full', msaa: 4, shadows: true },
+  medium: { dprCap: 1.5, dprMin: 0.85, smoke: 1000, trail: 3000, groundFog: 42, sparks: 240, contact: 14000, stars: 4000, transmission: 0.5, bloom: 'half', ao: 'half', msaa: 2, shadows: true },
+  low: { dprCap: 1.25, dprMin: 0.75, smoke: 420, trail: 1100, groundFog: 16, sparks: 90, contact: 6000, stars: 2000, transmission: 0, bloom: 'off', ao: 'off', msaa: 0, shadows: false },
 }
 
 export interface QualitySignals {

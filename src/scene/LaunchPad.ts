@@ -34,7 +34,7 @@ import { mulberry32 } from './textures'
 const TOWER = { x: -3.0, z: -2.1, w: 1.5, h: 12.6, level: 1.05 }
 const ARM_LEVELS = [3.1, 6.5, 8.95]
 /** Floodlight poles (x, z), lamp height and aim point; tools/blender/pad.py mirrors these. */
-const FLOODS: Array<[number, number]> = [
+export const FLOODS: Array<[number, number]> = [
   [12.5, 9.5],
   [-13, 7.5],
   [11, -11],
@@ -71,6 +71,7 @@ export class LaunchPad {
   private beams: ShaderMaterial
   private fog: ShaderMaterial[] = []
   private lights: ShaderMaterial
+  private halos: ShaderMaterial
 
   /** `structures` is the Blender-authored tower, mount, arms and floodlight rigs; without it they are built procedurally. */
   constructor(padTexture: Texture, noise: Texture, shadows: boolean, structures: PadModel | null = null) {
@@ -212,6 +213,32 @@ export class LaunchPad {
       vertexColors: true,
     })
     this.group.add(new Points(lightGeo, this.lights))
+
+    // Halos: lamp light scattering in the night haze around each flood head and the beacon.
+    this.group.updateMatrixWorld(true)
+    const beaconAt = this.beacon.getWorldPosition(new Vector3())
+    const haloPos = [...FLOODS.flatMap(([x, z]) => [x, FLOOD_HEAD_Y, z]), beaconAt.x, beaconAt.y, beaconAt.z]
+    const haloGeo = new BufferGeometry()
+    haloGeo.setAttribute('position', new BufferAttribute(new Float32Array(haloPos), 3))
+    haloGeo.setAttribute('aKind', new BufferAttribute(new Float32Array([0, 0, 0, 0, 1]), 1))
+    this.halos = new ShaderMaterial({
+      uniforms: {
+        uScale: { value: 800 },
+        uFlood: { value: 1 },
+        uBeacon: { value: 0 },
+        uFloodColor: { value: new Color('#cfdcff') },
+        uBeaconColor: { value: IGNITE.clone() },
+      },
+      vertexShader: HALO_VERT,
+      fragmentShader: HALO_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    })
+    const halos = new Points(haloGeo, this.halos)
+    halos.frustumCulled = false
+    halos.renderOrder = 2
+    this.group.add(halos)
   }
 
   /** Procedural stand-ins for the authored structures, used when pad.glb is unavailable. */
@@ -377,15 +404,23 @@ export class LaunchPad {
     this.lights.uniforms.uPixelRatio.value = dpr
   }
 
+  /** Projection scale for world-sized halos: pixels per world unit at distance 1. */
+  setProjection(viewportHeight: number, fovDeg: number, dpr: number) {
+    this.halos.uniforms.uScale.value = (viewportHeight * dpr) / (2 * Math.tan((fovDeg * Math.PI) / 360))
+  }
+
   update(_dt: number, time: number, state: DirectorState) {
     if (this.structures) this.structures.setArms(state.arms)
     else this.arms.forEach((arm, i) => (arm.rotation.y = this.armBase[i] + armSwing(state.arms, i)))
     const blink = Math.sin(time * 2.2) > 0.55 ? 1 : 0.08
     this.beacon.scale.setScalar(0.6 + blink * 0.4)
-    ;(this.beacon.material as MeshBasicMaterial).color.copy(IGNITE).multiplyScalar(0.4 + blink * 7)
+    // Bright enough to bloom, not so bright that tone mapping bleaches it white.
+    ;(this.beacon.material as MeshBasicMaterial).color.copy(IGNITE).multiplyScalar(0.25 + blink * 2.6)
+    this.halos.uniforms.uBeacon.value = blink
     this.beams.uniforms.uTime.value = time
     // Floods dim slightly as the engine outshines them.
     this.beams.uniforms.uIntensity.value = 1 - state.ignition * 0.35
+    this.halos.uniforms.uFlood.value = 1 - state.ignition * 0.35
     for (const mat of this.fog) {
       mat.uniforms.uTime.value = time
       mat.uniforms.uIgnition.value = state.ignition
@@ -398,6 +433,36 @@ export class LaunchPad {
     return this.group
   }
 }
+
+const HALO_VERT = /* glsl */ `
+attribute float aKind;
+uniform float uScale;
+uniform float uFlood;
+uniform float uBeacon;
+uniform vec3 uFloodColor;
+uniform vec3 uBeaconColor;
+varying vec3 vColor;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  // World-sized: 9 m around a flood head, 2.4 m around the beacon.
+  float size = mix(9.0, 2.4, aKind);
+  gl_PointSize = min(size * uScale / max(-mv.z, 0.5), 600.0);
+  gl_Position = projectionMatrix * mv;
+  vColor = mix(uFloodColor * 0.22 * uFlood, uBeaconColor * 0.5 * uBeacon, aKind);
+}
+`
+
+const HALO_FRAG = /* glsl */ `
+varying vec3 vColor;
+void main() {
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  if (d > 1.0) discard;
+  // Tight core plus a wide, faint skirt, like a lamp seen through haze.
+  float glow = exp(-d * d * 9.0) * 0.6 + exp(-d * d * 2.5) * 0.4;
+  glow *= 1.0 - smoothstep(0.7, 1.0, d);
+  gl_FragColor = vec4(vColor * glow, 1.0);
+}
+`
 
 const BEAM_VERT = /* glsl */ `
 varying float vAlong;
@@ -423,7 +488,7 @@ varying vec3 vWorld;
 void main() {
   vec3 view = normalize(cameraPosition - vWorld);
   float facing = abs(dot(normalize(vNormalW), view));
-  float soft = pow(facing, 2.2);
+  float soft = pow(facing, 1.6);
   // Interpolation can carry vAlong a hair past 1.0; pow() of a negative base is NaN on some GPUs.
   float falloff = pow(max(1.0 - vAlong, 0.0), 1.7) * smoothstep(0.0, 0.06, vAlong);
   float n = texture2D(uNoise, vWorld.xy * 0.06 + vec2(uTime * 0.01, -uTime * 0.012)).r;
@@ -432,7 +497,7 @@ void main() {
   // Fade before the hull and the ground so intersections never draw hard lines.
   float nearRocket = smoothstep(0.8, 3.2, length(vWorld.xz));
   float nearGround = smoothstep(0.0, 1.4, vWorld.y);
-  float a = soft * falloff * dust * 0.075 * uIntensity * nearRocket * nearGround;
+  float a = soft * falloff * dust * 0.11 * uIntensity * nearRocket * nearGround;
   gl_FragColor = vec4(uColor * a * 3.0, a);
 }
 `
