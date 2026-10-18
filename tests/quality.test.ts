@@ -27,6 +27,12 @@ describe('quality tier selection', () => {
     expect(pickTier({ ...base, gpu: '' })).toBe('medium')
   })
 
+  it('enables ambient occlusion at full res on high, half res on medium, off on low', () => {
+    expect(BUDGETS.high.ao).toBe('full')
+    expect(BUDGETS.medium.ao).toBe('half')
+    expect(BUDGETS.low.ao).toBe('off')
+  })
+
   it('budgets shrink monotonically from high to low', () => {
     for (const key of ['contact', 'stars', 'smoke', 'trail', 'dprCap'] as const) {
       expect(BUDGETS.high[key]).toBeGreaterThan(BUDGETS.medium[key])

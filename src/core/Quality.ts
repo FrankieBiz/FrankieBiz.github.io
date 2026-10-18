@@ -10,14 +10,16 @@ export interface QualityBudget {
   stars: number
   transmission: boolean
   bloom: 'full' | 'half' | 'off'
+  /** Ambient occlusion (N8AO). When on, hardware MSAA is replaced by SMAA. */
+  ao: 'full' | 'half' | 'off'
   msaa: number
   shadows: boolean
 }
 
 export const BUDGETS: Record<Tier, Omit<QualityBudget, 'tier'>> = {
-  high: { dprCap: 1.75, dprMin: 1, smoke: 1400, trail: 4600, contact: 20000, stars: 6000, transmission: true, bloom: 'full', msaa: 4, shadows: true },
-  medium: { dprCap: 1.5, dprMin: 0.85, smoke: 1000, trail: 3000, contact: 14000, stars: 4000, transmission: true, bloom: 'half', msaa: 2, shadows: true },
-  low: { dprCap: 1.25, dprMin: 0.75, smoke: 420, trail: 1100, contact: 6000, stars: 2000, transmission: false, bloom: 'off', msaa: 0, shadows: false },
+  high: { dprCap: 1.75, dprMin: 1, smoke: 1400, trail: 4600, contact: 20000, stars: 6000, transmission: true, bloom: 'full', ao: 'full', msaa: 4, shadows: true },
+  medium: { dprCap: 1.5, dprMin: 0.85, smoke: 1000, trail: 3000, contact: 14000, stars: 4000, transmission: true, bloom: 'half', ao: 'half', msaa: 2, shadows: true },
+  low: { dprCap: 1.25, dprMin: 0.75, smoke: 420, trail: 1100, contact: 6000, stars: 2000, transmission: false, bloom: 'off', ao: 'off', msaa: 0, shadows: false },
 }
 
 export interface QualitySignals {
