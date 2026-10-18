@@ -144,3 +144,86 @@ def triangle_count(objects):
         total += len(mesh.loop_triangles)
         obj.evaluated_get(depsgraph).to_mesh_clear()
     return total
+
+
+# --------------------------------------------------------------------- mesh helpers
+
+
+def smooth(obj, angle=30):
+    """Smooth shading with sharp edges above `angle` degrees."""
+    import math
+
+    for poly in obj.data.polygons:
+        poly.use_smooth = True
+    obj.data.set_sharp_from_angle(angle=math.radians(angle))
+
+
+def apply_modifiers(obj):
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
+    obj.modifiers.clear()
+    old = obj.data
+    obj.data = mesh
+    bpy.data.meshes.remove(old)
+
+
+def box(name, size, location, rotation_z=0.0, rotation=None):
+    """A box with scale applied (so modifiers and exports see real dimensions)."""
+    bpy.ops.mesh.primitive_cube_add(size=1, location=location, rotation=rotation or (0, 0, rotation_z))
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.scale = size
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return obj
+
+
+def join(objs, name):
+    with bpy.context.temp_override(active_object=objs[0], selected_objects=objs, selected_editable_objects=objs):
+        bpy.ops.object.join()
+    objs[0].name = name
+    objs[0].data.name = name
+    return objs[0]
+
+
+def apply_transforms(objs, location=True, rotation=True, scale=True):
+    for obj in objs:
+        with bpy.context.temp_override(active_object=obj, selected_editable_objects=[obj]):
+            bpy.ops.object.transform_apply(location=location, rotation=rotation, scale=scale)
+
+
+def bake_ao(objects, path, size, distance, samples=64, uv_layer=None):
+    """Bake ambient occlusion for `objects` into one image (non-overlapping UVs required).
+
+    `uv_layer` names the UV map to bake into (made active during the bake).
+    """
+    scene = bpy.context.scene
+    if scene.world is None:
+        scene.world = bpy.data.worlds.new("BakeWorld")
+    scene.world.light_settings.distance = distance
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = samples
+    image = bpy.data.images.new(os.path.basename(path), *size)
+    added = []
+    previous_active = {}
+    for obj in objects:
+        if uv_layer:
+            previous_active[obj] = obj.data.uv_layers.active_index
+            obj.data.uv_layers.active = obj.data.uv_layers[uv_layer]
+        for mat in obj.data.materials:
+            node = mat.node_tree.nodes.new("ShaderNodeTexImage")
+            node.image = image
+            mat.node_tree.nodes.active = node
+            added.append((mat, node))
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
+    bpy.ops.object.bake(type="AO", margin=8)
+    image.filepath_raw = path
+    image.file_format = "PNG"
+    image.save()
+    for mat, node in added:
+        mat.node_tree.nodes.remove(node)
+    for obj, index in previous_active.items():
+        obj.data.uv_layers.active_index = index

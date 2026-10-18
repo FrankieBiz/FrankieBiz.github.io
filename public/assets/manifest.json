@@ -148,6 +148,69 @@
           "width": 1024
         }
       }
+    },
+    {
+      "id": "pad",
+      "kind": "gltf",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/pad-high.glb",
+          "bytes": 295060
+        },
+        "medium": {
+          "url": "assets/pad-medium.glb",
+          "bytes": 295060
+        },
+        "low": {
+          "url": "assets/pad-low.glb",
+          "bytes": 295060
+        }
+      }
+    },
+    {
+      "id": "pad-ao",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/pad-ao-high.webp",
+          "bytes": 715772,
+          "width": 2048
+        },
+        "medium": {
+          "url": "assets/pad-ao-medium.webp",
+          "bytes": 195256,
+          "width": 1024
+        },
+        "low": {
+          "url": "assets/pad-ao-low.webp",
+          "bytes": 195256,
+          "width": 1024
+        }
+      }
+    },
+    {
+      "id": "ground-ao",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/ground-ao-high.webp",
+          "bytes": 8970,
+          "width": 1024
+        },
+        "medium": {
+          "url": "assets/ground-ao-medium.webp",
+          "bytes": 8970,
+          "width": 1024
+        },
+        "low": {
+          "url": "assets/ground-ao-low.webp",
+          "bytes": 2038,
+          "width": 512
+        }
+      }
     }
   ]
 }

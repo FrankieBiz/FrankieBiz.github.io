@@ -28,13 +28,28 @@ import {
 } from 'three'
 import type { DirectorState } from '../director/state'
 import { PAD_ROCKET_Y } from './layout'
+import { armSwing, type PadModel } from './PadModel'
 import { mulberry32 } from './textures'
 
 const TOWER = { x: -3.0, z: -2.1, w: 1.5, h: 12.6, level: 1.05 }
 const ARM_LEVELS = [3.1, 6.5, 8.95]
+/** Floodlight poles (x, z), lamp height and aim point; tools/blender/pad.py mirrors these. */
+const FLOODS: Array<[number, number]> = [
+  [12.5, 9.5],
+  [-13, 7.5],
+  [11, -11],
+  [-9.5, -12.5],
+]
+const FLOOD_HEAD_Y = 9.1
+const AIM = new Vector3(0, 5.5, 0)
 
 const FROST = new Color('#e8eef5')
 const IGNITE = new Color('#ff6a1a')
+
+/** Glowing lamp faces, shared by the authored and procedural floodlight rigs. */
+export function createFloodLensMaterial() {
+  return new MeshBasicMaterial({ color: FROST.clone().multiplyScalar(7) })
+}
 
 /** Beam between two points on a unit box instance. */
 function beamMatrix(a: Vector3, b: Vector3, thickness: number, out: Matrix4) {
@@ -51,15 +66,14 @@ export class LaunchPad {
   readonly rimLight: SpotLight
   private arms: Group[] = []
   private armBase: number[] = []
+  private structures: PadModel | null
   private beacon: Mesh
   private beams: ShaderMaterial
   private fog: ShaderMaterial[] = []
   private lights: ShaderMaterial
 
-  constructor(padTexture: Texture, noise: Texture, shadows: boolean) {
-    const steel = new MeshStandardMaterial({ color: '#2a3039', roughness: 0.55, metalness: 0.65 })
-    const concrete = new MeshStandardMaterial({ color: '#363c45', roughness: 0.88, metalness: 0.05 })
-
+  /** `structures` is the Blender-authored tower, mount, arms and floodlight rigs; without it they are built procedurally. */
+  constructor(padTexture: Texture, noise: Texture, shadows: boolean, structures: PadModel | null = null) {
     // Ground and pad.
     const ground = new Mesh(
       new CircleGeometry(4000, 96),
@@ -78,6 +92,132 @@ export class LaunchPad {
     pad.position.y = 0.01
     pad.receiveShadow = shadows
     this.group.add(pad)
+
+    this.structures = structures
+    this.beacon = new Mesh(new SphereGeometry(0.075, 12, 8), new MeshBasicMaterial({ color: IGNITE.clone().multiplyScalar(6) }))
+    if (structures) {
+      this.group.add(structures.group)
+      structures.beacon.add(this.beacon)
+    } else {
+      this.buildStructures(shadows)
+    }
+
+    // Work lights on each platform, at the corner facing the rocket.
+    const stripMat = new MeshBasicMaterial({ color: FROST.clone().multiplyScalar(3.2) })
+    const stripGeo = new BoxGeometry(0.5, 0.03, 0.03)
+    const half = TOWER.w / 2
+    for (const y of [...ARM_LEVELS, TOWER.h]) {
+      const strip = new Mesh(stripGeo, stripMat)
+      strip.position.set(TOWER.x + half + 0.18, y - 0.2, TOWER.z + half + 0.18)
+      strip.rotation.y = -Math.PI / 4
+      this.group.add(strip)
+    }
+
+    // Fake volumetric beams from the floodlight heads.
+    this.beams = new ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uIntensity: { value: 1 }, uNoise: { value: noise }, uColor: { value: new Color('#cfdcff') } },
+      vertexShader: BEAM_VERT,
+      fragmentShader: BEAM_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      side: DoubleSide,
+    })
+    const beamLength = 19
+    const beamGeo = new CylinderGeometry(0.32, 3.6, beamLength, 40, 1, true)
+    beamGeo.translate(0, -beamLength / 2, 0)
+    for (const [x, z] of FLOODS) {
+      const beam = new Mesh(beamGeo, this.beams)
+      beam.position.set(x, FLOOD_HEAD_Y, z)
+      const dir = new Vector3().subVectors(AIM, beam.position).normalize()
+      beam.quaternion.setFromUnitVectors(new Vector3(0, -1, 0), dir)
+      beam.renderOrder = 2
+      this.group.add(beam)
+    }
+
+    const key = new SpotLight('#dfe8ff', 320, 70, 0.42, 0.55, 1.5)
+    key.position.set(FLOODS[0][0], FLOOD_HEAD_Y, FLOODS[0][1])
+    key.target.position.copy(AIM)
+    key.castShadow = shadows
+    key.shadow.mapSize.set(1024, 1024)
+    key.shadow.bias = -0.0004
+    key.shadow.normalBias = 0.02
+    key.shadow.camera.near = 4
+    key.shadow.camera.far = 60
+    this.keyLight = key
+    const rim = new SpotLight('#b9cbff', 300, 70, 0.4, 0.6, 1.5)
+    rim.position.set(FLOODS[3][0], FLOOD_HEAD_Y, FLOODS[3][1])
+    rim.target.position.copy(AIM)
+    this.rimLight = rim
+    this.group.add(key, key.target, rim, rim.target)
+
+    // Ground fog layers.
+    const fogGeo = new PlaneGeometry(90, 90, 1, 1)
+    fogGeo.rotateX(-Math.PI / 2)
+    ;[0.22, 0.65, 1.1].forEach((y, i) => {
+      const mat = new ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uNoise: { value: noise },
+          uOffset: { value: i * 17.3 },
+          uOpacity: { value: 0.55 - i * 0.12 },
+          uIgnition: { value: 0 },
+          uColor: { value: new Color('#1d2a3d') },
+          uGlow: { value: IGNITE.clone() },
+        },
+        vertexShader: FOG_VERT,
+        fragmentShader: FOG_FRAG,
+        transparent: true,
+        depthWrite: false,
+        blending: NormalBlending,
+      })
+      const layer = new Mesh(fogGeo, mat)
+      layer.position.y = y
+      layer.renderOrder = 1
+      this.fog.push(mat)
+      this.group.add(layer)
+    })
+
+    // Distant facility lights and the pad perimeter ring.
+    const rand = mulberry32(41)
+    const pts: number[] = []
+    const cols: number[] = []
+    const sizes: number[] = []
+    const warm = new Color('#ffd9b0')
+    for (let i = 0; i < 160; i++) {
+      const a = rand() * Math.PI * 2
+      const r = 70 + rand() * 180
+      pts.push(Math.cos(a) * r, 0.3 + rand() * 4, Math.sin(a) * r)
+      const c = rand() > 0.7 ? warm : FROST
+      cols.push(c.r, c.g, c.b)
+      sizes.push(1.5 + rand() * 2.5)
+    }
+    for (let i = 0; i < 36; i++) {
+      const a = (i / 36) * Math.PI * 2
+      pts.push(Math.cos(a) * 14.4, 0.08, Math.sin(a) * 14.4)
+      cols.push(FROST.r, FROST.g, FROST.b)
+      sizes.push(3.2)
+    }
+    const lightGeo = new BufferGeometry()
+    lightGeo.setAttribute('position', new BufferAttribute(new Float32Array(pts), 3))
+    lightGeo.setAttribute('color', new BufferAttribute(new Float32Array(cols), 3))
+    lightGeo.setAttribute('aSize', new BufferAttribute(new Float32Array(sizes), 1))
+    this.lights = new ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uPixelRatio: { value: 1 } },
+      vertexShader: LIGHTS_VERT,
+      fragmentShader: LIGHTS_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      vertexColors: true,
+    })
+    this.group.add(new Points(lightGeo, this.lights))
+  }
+
+  /** Procedural stand-ins for the authored structures, used when pad.glb is unavailable. */
+  private buildStructures(shadows: boolean) {
+    const steel = new MeshStandardMaterial({ color: '#2a3039', roughness: 0.55, metalness: 0.65 })
+    const concrete = new MeshStandardMaterial({ color: '#363c45', roughness: 0.88, metalness: 0.05 })
 
     // Launch mount: four legs and a square frame around the flame hole.
     const mount = new Group()
@@ -156,24 +296,18 @@ export class LaunchPad {
     towerGroup.position.set(TOWER.x, 0, TOWER.z)
     towerGroup.add(tower)
 
-    // Platforms with strip lights facing the rocket.
-    const stripMat = new MeshBasicMaterial({ color: FROST.clone().multiplyScalar(3.2) })
+    // Platforms at the arm levels and the top.
     const platformGeo = new BoxGeometry(TOWER.w + 0.35, 0.07, TOWER.w + 0.35)
     for (const y of [...ARM_LEVELS, TOWER.h]) {
       const platform = new Mesh(platformGeo, steel)
       platform.position.y = y - 0.25
       platform.castShadow = shadows
       towerGroup.add(platform)
-      const strip = new Mesh(new BoxGeometry(0.5, 0.03, 0.03), stripMat)
-      strip.position.set(half + 0.18, y - 0.2, half + 0.18)
-      strip.rotation.y = -Math.PI / 4
-      towerGroup.add(strip)
     }
     // Lightning mast and beacon.
     const mast = new Mesh(new CylinderGeometry(0.025, 0.05, 3.4, 8), steel)
     mast.position.y = TOWER.h + 1.7
     towerGroup.add(mast)
-    this.beacon = new Mesh(new SphereGeometry(0.075, 12, 8), new MeshBasicMaterial({ color: IGNITE.clone().multiplyScalar(6) }))
     this.beacon.position.y = TOWER.h + 3.45
     towerGroup.add(this.beacon)
     this.group.add(towerGroup)
@@ -220,127 +354,23 @@ export class LaunchPad {
       this.group.add(arm)
     })
 
-    // Floodlight towers with fake volumetric beams.
-    const floods: Array<[number, number]> = [
-      [12.5, 9.5],
-      [-13, 7.5],
-      [11, -11],
-      [-9.5, -12.5],
-    ]
-    const aim = new Vector3(0, 5.5, 0)
-    this.beams = new ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uIntensity: { value: 1 }, uNoise: { value: noise }, uColor: { value: new Color('#cfdcff') } },
-      vertexShader: BEAM_VERT,
-      fragmentShader: BEAM_FRAG,
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-      side: DoubleSide,
-    })
-    const beamLength = 19
-    const beamGeo = new CylinderGeometry(0.32, 3.6, beamLength, 40, 1, true)
-    beamGeo.translate(0, -beamLength / 2, 0)
-    const headMat = new MeshBasicMaterial({ color: FROST.clone().multiplyScalar(7) })
+    // Floodlight poles and lamp heads.
+    const lens = createFloodLensMaterial()
     const poleGeo = new CylinderGeometry(0.09, 0.14, 9, 8)
-    floods.forEach(([x, z]) => {
+    for (const [x, z] of FLOODS) {
       const pole = new Mesh(poleGeo, steel)
       pole.position.set(x, 4.5, z)
       this.group.add(pole)
       const head = new Group()
-      head.position.set(x, 9.1, z)
-      head.lookAt(aim)
+      head.position.set(x, FLOOD_HEAD_Y, z)
+      head.lookAt(AIM)
       const housing = new Mesh(new BoxGeometry(1.25, 0.6, 0.28), steel)
       head.add(housing)
-      const face = new Mesh(new PlaneGeometry(1.1, 0.46), headMat)
+      const face = new Mesh(new PlaneGeometry(1.1, 0.46), lens)
       face.position.z = 0.145
       head.add(face)
       this.group.add(head)
-
-      const beam = new Mesh(beamGeo, this.beams)
-      beam.position.copy(head.position)
-      const dir = new Vector3().subVectors(aim, head.position).normalize()
-      beam.quaternion.setFromUnitVectors(new Vector3(0, -1, 0), dir)
-      beam.renderOrder = 2
-      this.group.add(beam)
-    })
-
-    const key = new SpotLight('#dfe8ff', 320, 70, 0.42, 0.55, 1.5)
-    key.position.set(floods[0][0], 9.1, floods[0][1])
-    key.target.position.copy(aim)
-    key.castShadow = shadows
-    key.shadow.mapSize.set(1024, 1024)
-    key.shadow.bias = -0.0004
-    key.shadow.normalBias = 0.02
-    key.shadow.camera.near = 4
-    key.shadow.camera.far = 60
-    this.keyLight = key
-    const rim = new SpotLight('#b9cbff', 300, 70, 0.4, 0.6, 1.5)
-    rim.position.set(floods[3][0], 9.1, floods[3][1])
-    rim.target.position.copy(aim)
-    this.rimLight = rim
-    this.group.add(key, key.target, rim, rim.target)
-
-    // Ground fog layers.
-    const fogGeo = new PlaneGeometry(90, 90, 1, 1)
-    fogGeo.rotateX(-Math.PI / 2)
-    ;[0.22, 0.65, 1.1].forEach((y, i) => {
-      const mat = new ShaderMaterial({
-        uniforms: {
-          uTime: { value: 0 },
-          uNoise: { value: noise },
-          uOffset: { value: i * 17.3 },
-          uOpacity: { value: 0.55 - i * 0.12 },
-          uIgnition: { value: 0 },
-          uColor: { value: new Color('#1d2a3d') },
-          uGlow: { value: IGNITE.clone() },
-        },
-        vertexShader: FOG_VERT,
-        fragmentShader: FOG_FRAG,
-        transparent: true,
-        depthWrite: false,
-        blending: NormalBlending,
-      })
-      const layer = new Mesh(fogGeo, mat)
-      layer.position.y = y
-      layer.renderOrder = 1
-      this.fog.push(mat)
-      this.group.add(layer)
-    })
-
-    // Distant facility lights and the pad perimeter ring.
-    const rand = mulberry32(41)
-    const pts: number[] = []
-    const cols: number[] = []
-    const sizes: number[] = []
-    const warm = new Color('#ffd9b0')
-    for (let i = 0; i < 160; i++) {
-      const a = rand() * Math.PI * 2
-      const r = 70 + rand() * 180
-      pts.push(Math.cos(a) * r, 0.3 + rand() * 4, Math.sin(a) * r)
-      const c = rand() > 0.7 ? warm : FROST
-      cols.push(c.r, c.g, c.b)
-      sizes.push(1.5 + rand() * 2.5)
     }
-    for (let i = 0; i < 36; i++) {
-      const a = (i / 36) * Math.PI * 2
-      pts.push(Math.cos(a) * 14.4, 0.08, Math.sin(a) * 14.4)
-      cols.push(FROST.r, FROST.g, FROST.b)
-      sizes.push(3.2)
-    }
-    const lightGeo = new BufferGeometry()
-    lightGeo.setAttribute('position', new BufferAttribute(new Float32Array(pts), 3))
-    lightGeo.setAttribute('color', new BufferAttribute(new Float32Array(cols), 3))
-    lightGeo.setAttribute('aSize', new BufferAttribute(new Float32Array(sizes), 1))
-    this.lights = new ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uPixelRatio: { value: 1 } },
-      vertexShader: LIGHTS_VERT,
-      fragmentShader: LIGHTS_FRAG,
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-      vertexColors: true,
-    })
-    this.group.add(new Points(lightGeo, this.lights))
   }
 
   setPixelRatio(dpr: number) {
@@ -348,11 +378,8 @@ export class LaunchPad {
   }
 
   update(_dt: number, time: number, state: DirectorState) {
-    this.arms.forEach((arm, i) => {
-      const local = Math.min(Math.max(state.arms * 1.4 - i * 0.2, 0), 1)
-      const eased = local * local * (3 - 2 * local)
-      arm.rotation.y = this.armBase[i] + eased * 1.35
-    })
+    if (this.structures) this.structures.setArms(state.arms)
+    else this.arms.forEach((arm, i) => (arm.rotation.y = this.armBase[i] + armSwing(state.arms, i)))
     const blink = Math.sin(time * 2.2) > 0.55 ? 1 : 0.08
     this.beacon.scale.setScalar(0.6 + blink * 0.4)
     ;(this.beacon.material as MeshBasicMaterial).color.copy(IGNITE).multiplyScalar(0.4 + blink * 7)

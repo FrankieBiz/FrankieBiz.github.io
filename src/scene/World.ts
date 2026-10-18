@@ -27,9 +27,10 @@ import type { Quality } from '../core/Quality'
 import { worldForWarp, type DirectorState } from '../director/state'
 import { CameraRig } from './CameraRig'
 import { Exhaust } from './Exhaust'
-import { LaunchPad } from './LaunchPad'
+import { createFloodLensMaterial, LaunchPad } from './LaunchPad'
 import { fieldPosition, ORBIT_ROCKET, PAD_ROCKET_Y } from './layout'
 import { NamePlate } from './NamePlate'
+import { PadModel } from './PadModel'
 import { ParticleField } from './ParticleField'
 import { Payloads } from './Payloads'
 import { Planet } from './Planet'
@@ -129,8 +130,12 @@ export class World {
     this.rocket = (authored && RocketModel.fromGltf(authored, paint, hullAo, budget.shadows)) || new Rocket(paint, budget.shadows)
     this.scene.add(this.rocket.group)
 
-    // Pad world.
-    this.launchPad = new LaunchPad(createPadTexture(), noise, budget.shadows)
+    // Pad world, with the Blender-authored structures when they loaded.
+    const padGltf = assets.get('pad') as { scene: Object3D } | undefined
+    const padAo = (assets.get('pad-ao') as Texture | undefined) ?? null
+    const structures = (padGltf && PadModel.fromGltf(padGltf, padAo, createFloodLensMaterial(), budget.shadows)) || null
+    const contactShadows = structures ? ((assets.get('ground-ao') as Texture | undefined) ?? null) : null
+    this.launchPad = new LaunchPad(createPadTexture(contactShadows), noise, budget.shadows, structures)
     this.pad.add(this.launchPad.group)
     this.exhaust = new Exhaust(budget, createPuffTexture())
     this.rocket.nozzle.add(this.exhaust.flame)

@@ -117,42 +117,14 @@ def lathe(name, profile, segments, uv_for=None):
     return obj
 
 
-def smooth(obj, angle=30):
-    for poly in obj.data.polygons:
-        poly.use_smooth = True
-    obj.data.set_sharp_from_angle(angle=math.radians(angle))
 
 
-def apply_modifiers(obj):
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
-    obj.modifiers.clear()
-    old = obj.data
-    obj.data = mesh
-    bpy.data.meshes.remove(old)
 
 
-def box(name, size, location, rotation_z=0.0):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=location, rotation=(0, 0, rotation_z))
-    obj = bpy.context.active_object
-    obj.name = name
-    obj.scale = size
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    return obj
 
 
-def join(objs, name):
-    with bpy.context.temp_override(active_object=objs[0], selected_objects=objs, selected_editable_objects=objs):
-        bpy.ops.object.join()
-    objs[0].name = name
-    objs[0].data.name = name
-    return objs[0]
 
 
-def apply_transforms(objs):
-    for obj in objs:
-        with bpy.context.temp_override(active_object=obj, selected_editable_objects=[obj]):
-            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
 
 def build():
@@ -165,7 +137,7 @@ def build():
     # Hull with seam grooves; UV v by height, like three.js LatheGeometry.
     hull = lathe("Hull", hull_profile(), SEGMENTS, uv_for=lambda z: (z - HULL_Y0) / (HULL_Y1 - HULL_Y0))
     common.assign(hull, paint)
-    smooth(hull)
+    common.smooth(hull)
 
     # Fins: swept planform, solid with bevelled edges, plus a root doubler plate.
     fins = []
@@ -180,26 +152,26 @@ def build():
         solid.thickness, solid.offset = 0.05, 0.0
         bevel = fin.modifiers.new("Bevel", "BEVEL")
         bevel.width, bevel.segments, bevel.limit_method = 0.012, 2, "ANGLE"
-        apply_modifiers(fin)
+        common.apply_modifiers(fin)
         fin.location = (0, 0, 0)
         fin.data.transform(Matrix.Translation((R - 0.08, 0, 0)))
-        doubler = box(f"Doubler_{i}", (0.02, 0.16, 1.95), (R + 0.006, 0, 1.25))
-        fin_obj = join([fin, doubler], f"Fin_{i}")
+        doubler = common.box(f"Doubler_{i}", (0.02, 0.16, 1.95), (R + 0.006, 0, 1.25))
+        fin_obj = common.join([fin, doubler], f"Fin_{i}")
         fin_obj.rotation_euler = (0, 0, angle)
         common.assign(fin_obj, graphite)
-        smooth(fin_obj, 40)
+        common.smooth(fin_obj, 40)
         fins.append(fin_obj)
 
     # Cable raceway with brackets, ~20° right of the painted name as seen from the camera.
     race_angle = math.radians(20)
     rx, ry = math.sin(race_angle), -math.cos(race_angle)
     rot = math.atan2(ry, rx)
-    parts = [box("Raceway", (0.045, 0.07, 5.5), ((R + 0.012) * rx, (R + 0.012) * ry, 3.85), rot)]
+    parts = [common.box("Raceway", (0.045, 0.07, 5.5), ((R + 0.012) * rx, (R + 0.012) * ry, 3.85), rot)]
     z = 1.3
     while z < 6.4:
-        parts.append(box("Bracket", (0.03, 0.11, 0.02), ((R + 0.006) * rx, (R + 0.006) * ry, z), rot))
+        parts.append(common.box("Bracket", (0.03, 0.11, 0.02), ((R + 0.006) * rx, (R + 0.006) * ry, z), rot))
         z += 0.45
-    raceway = join(parts, "Raceway")
+    raceway = common.join(parts, "Raceway")
     common.assign(raceway, graphite)
 
     # Engine bell (profile from the exit up to the throat), solid, with cooling ribs.
@@ -212,32 +184,32 @@ def build():
             v.co.y *= 1.012
     solid = bell.modifiers.new("Solidify", "SOLIDIFY")
     solid.thickness, solid.offset = 0.012, -1.0
-    apply_modifiers(bell)
+    common.apply_modifiers(bell)
     bpy.ops.mesh.primitive_torus_add(major_radius=0.215, minor_radius=0.026, major_segments=64, minor_segments=12, location=(0, 0, 0.12))
     manifold = bpy.context.active_object
     actuators = []
     for side in (-1, 1):
         bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.022, depth=0.34, location=(side * 0.27, 0, 0.2), rotation=(0, side * 0.55, 0))
         actuators.append(bpy.context.active_object)
-    nozzle = join([bell, manifold] + actuators, "Nozzle")
+    nozzle = common.join([bell, manifold] + actuators, "Nozzle")
     common.assign(nozzle, metal)
-    smooth(nozzle, 35)
+    common.smooth(nozzle, 35)
 
     # Hold-down fittings between the fins and an umbilical plate under the middle arm.
     holds = []
     for i in range(4):
         a = i * math.pi / 2
-        holds.append(box("Hold", (0.12, 0.1, 0.16), (0.47 * math.cos(a), 0.47 * math.sin(a), 0.38), a))
-    hold_downs = join(holds, "HoldDowns")
+        holds.append(common.box("Hold", (0.12, 0.1, 0.16), (0.47 * math.cos(a), 0.47 * math.sin(a), 0.38), a))
+    hold_downs = common.join(holds, "HoldDowns")
     common.assign(hold_downs, steel)
 
     ux, uy = UMBILICAL_DIR
     urot = math.atan2(uy, ux)
-    plate = [box("Umbilical", (0.02, 0.18, 0.26), ((R + 0.008) * ux, (R + 0.008) * uy, UMBILICAL_Z), urot)]
+    plate = [common.box("Umbilical", (0.02, 0.18, 0.26), ((R + 0.008) * ux, (R + 0.008) * uy, UMBILICAL_Z), urot)]
     for dz in (-0.07, 0.0, 0.07):
         bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.022, depth=0.03, location=((R + 0.024) * ux, (R + 0.024) * uy, UMBILICAL_Z + dz), rotation=(0, math.pi / 2, urot))
         plate.append(bpy.context.active_object)
-    umbilical = join(plate, "Umbilical")
+    umbilical = common.join(plate, "Umbilical")
     common.assign(umbilical, dark)
 
     exit_anchor = bpy.data.objects.new("NozzleExit", None)
@@ -245,32 +217,10 @@ def build():
     exit_anchor.location = (0, 0, NOZZLE_EXIT)
 
     meshes = [hull, *fins, raceway, nozzle, hold_downs, umbilical]
-    apply_transforms(meshes)
+    common.apply_transforms(meshes)
     return hull, meshes, exit_anchor
 
 
-def bake_hull_ao(hull, path, size=(1024, 2048), samples=64):
-    """Bake local ambient occlusion (grooves, fin roots, raceway) into the hull UVs."""
-    scene = bpy.context.scene
-    world = bpy.data.worlds.new("BakeWorld")
-    scene.world = world
-    world.light_settings.distance = 0.6
-    scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
-    scene.cycles.samples = samples
-    image = bpy.data.images.new("HullAO", *size)
-    mat = hull.data.materials[0]
-    node = mat.node_tree.nodes.new("ShaderNodeTexImage")
-    node.image = image
-    mat.node_tree.nodes.active = node
-    bpy.ops.object.select_all(action="DESELECT")
-    hull.select_set(True)
-    bpy.context.view_layer.objects.active = hull
-    bpy.ops.object.bake(type="AO", margin=8)
-    image.filepath_raw = path
-    image.file_format = "PNG"
-    image.save()
-    mat.node_tree.nodes.remove(node)
 
 
 def main():
@@ -280,7 +230,7 @@ def main():
     hull, meshes, exit_anchor = build()
     print(f"[rocket] triangles: {common.triangle_count(meshes)}")
     if not opts.no_bake:
-        bake_hull_ao(hull, os.path.join(out, "rocket-ao.png"))
+        common.bake_ao([hull], os.path.join(out, "rocket-ao.png"), size=(1024, 2048), distance=0.6)
     common.export_glb(os.path.join(out, "rocket.glb"), [*meshes, exit_anchor])
     common.save_blend(os.path.join(out, "rocket.blend"))
     if not opts.no_preview:

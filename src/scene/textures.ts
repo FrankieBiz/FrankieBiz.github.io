@@ -200,7 +200,11 @@ export function createHullTextures(): HullTextures {
 // ------------------------------------------------------------------- pad
 
 /** Pad disc texture; the disc has radius 16 world units. */
-export function createPadTexture(): Texture {
+/**
+ * `contactShadows` is the ground AO baked under the authored structures
+ * (tools/blender/pad.py), laid out on the same UVs as the pad disc.
+ */
+export function createPadTexture(contactShadows: Texture | null = null): Texture {
   const S = 2048
   const R = 16
   const px = S / (R * 2)
@@ -284,6 +288,17 @@ export function createPadTexture(): Texture {
   ctx.font = `700 ${1.8 * px}px ${DISPLAY_FONT}`
   ctx.fillText('LC-01', 0, 0)
   ctx.restore()
+
+  // three's aoMap only darkens ambient light, so bake the contact shadows into the
+  // albedo instead. Decoded bitmaps arrive pre-flipped (src/assets/decoders.ts): undo it.
+  if (contactShadows) {
+    ctx.save()
+    ctx.globalCompositeOperation = 'multiply'
+    ctx.translate(0, S)
+    ctx.scale(1, -1)
+    ctx.drawImage(contactShadows.image as CanvasImageSource, 0, 0, S, S)
+    ctx.restore()
+  }
 
   const t = new CanvasTexture(c)
   t.colorSpace = SRGBColorSpace

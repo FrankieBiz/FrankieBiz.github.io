@@ -38,6 +38,18 @@ export const ASSETS = [
     optimize: ['--join', 'false', '--flatten', 'false', '--instance', 'false', '--palette', 'false', '--simplify', 'false', '--prune', 'false'],
   },
   { id: 'rocket-ao', kind: 'texture', src: 'blender/rocket-ao.png', width: { high: 1024, medium: 512, low: 512 }, quality: 88 },
+  // Authored pad structures (tools/blender/pad.py): same no-merge rules as the rocket, since
+  // the site drives the arms and the beacon anchor by name. AO atlas on the second UV set,
+  // and contact shadows for the ground, multiplied into the pad texture.
+  {
+    id: 'pad',
+    kind: 'gltf',
+    src: 'blender/pad.glb',
+    width: { high: 2048, medium: 2048, low: 1024 },
+    optimize: ['--join', 'false', '--flatten', 'false', '--instance', 'false', '--palette', 'false', '--simplify', 'false', '--prune', 'false'],
+  },
+  { id: 'pad-ao', kind: 'texture', src: 'blender/pad-ao.png', width: { high: 2048, medium: 1024, low: 1024 }, quality: 86 },
+  { id: 'ground-ao', kind: 'texture', src: 'blender/ground-ao.png', width: { high: 1024, medium: 1024, low: 512 }, quality: 86 },
 ]
 
 /** Per-pixel transforms over RGBA buffers (rules live in src/assets/earthMaps.ts). */
