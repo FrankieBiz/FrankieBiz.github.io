@@ -21,6 +21,13 @@ function runUntilChange(g: DprGovernor, fps: number, limit = 600) {
 
 const policy = { min: 0.85, max: 1.5 }
 
+/** A governor that has seen a 60 Hz display at full speed (the light pad act does this). */
+function on60Hz(ratio = 1.5) {
+  const g = new DprGovernor(ratio, policy)
+  run(g, 60, 2)
+  return g
+}
+
 describe('DPR governor', () => {
   it('leaves a steady 60 fps alone', () => {
     const g = new DprGovernor(1.5, policy)
@@ -29,13 +36,13 @@ describe('DPR governor', () => {
   })
 
   it('steps down when frames run below ~55 fps, not only below 45', () => {
-    const g = new DprGovernor(1.5, policy)
+    const g = on60Hz()
     expect(runUntilChange(g, 50)).toBeGreaterThan(0)
     expect(g.ratio).toBeCloseTo(1.35)
   })
 
   it('keeps stepping down while still slow, never below the floor', () => {
-    const g = new DprGovernor(1.5, policy)
+    const g = on60Hz()
     run(g, 20, 60)
     expect(g.ratio).toBeCloseTo(0.85)
   })
@@ -46,7 +53,7 @@ describe('DPR governor', () => {
   })
 
   it('ignores the resize hitch right after a change, so one drop does not cascade', () => {
-    const g = new DprGovernor(1.5, policy)
+    const g = on60Hz()
     runUntilChange(g, 50)
     expect(g.ratio).toBeCloseTo(1.35)
     // Reallocating every render target costs one long frame; the lower resolution then holds 60.
@@ -56,7 +63,7 @@ describe('DPR governor', () => {
   })
 
   it('waits ~10 s after a drop before trying a higher resolution again', () => {
-    const g = new DprGovernor(1.5, policy)
+    const g = on60Hz()
     runUntilChange(g, 50)
     const changes = run(g, 60, 30)
     expect(changes[0].ratio).toBeCloseTo(1.45)
@@ -76,5 +83,47 @@ describe('DPR governor', () => {
     const g = new DprGovernor(1.2, policy)
     run(g, 60, 120)
     expect(g.ratio).toBeCloseTo(1.5)
+  })
+})
+
+describe('DPR governor on other displays', () => {
+  it('keeps full resolution on a 50 Hz or 48 Hz display when the GPU keeps up', () => {
+    for (const hz of [50, 48]) {
+      const g = new DprGovernor(1.5, policy)
+      expect(run(g, hz, 60), `${hz} Hz`).toEqual([])
+      expect(g.ratio).toBe(1.5)
+    }
+  })
+
+  it('does not chase 120 fps on a fast display: 90 fps is plenty', () => {
+    const g = new DprGovernor(1.5, policy)
+    run(g, 120, 2)
+    expect(run(g, 90, 30)).toEqual([])
+  })
+
+  it('still steps down when a 60 Hz display misses vsync (16.7 / 33.3 ms frames)', () => {
+    const g = new DprGovernor(1.5, policy)
+    let changed = false
+    for (let i = 0; i < 600 && !changed; i++) changed = g.sample(i % 2 ? 2 / 60 : 1 / 60) !== null
+    expect(changed).toBe(true)
+    expect(g.ratio).toBeCloseTo(1.35)
+  })
+})
+
+describe('DPR governor policy changes', () => {
+  it('keeps its hold-off across a policy update (mobile URL-bar resizes)', () => {
+    const g = on60Hz()
+    runUntilChange(g, 50)
+    expect(g.setPolicy({ min: 0.85, max: 1.5 })).toBeNull()
+    // Still inside the ~10 s hold: no early raise.
+    expect(run(g, 60, 8)).toEqual([])
+  })
+
+  it('clamps the ratio when the display offers less (window moved to a 1x screen)', () => {
+    const g = new DprGovernor(1.5, policy)
+    expect(g.setPolicy({ min: 0.85, max: 1 })).toBe(1)
+    expect(g.ratio).toBe(1)
+    run(g, 60, 60)
+    expect(g.ratio).toBe(1)
   })
 })

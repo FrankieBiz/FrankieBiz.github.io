@@ -54,17 +54,22 @@ export class Renderer {
   }
 
   /** Ratio range for this display: up to its devicePixelRatio (capped by tier). */
-  private createGovernor() {
+  private policy() {
     const max = Math.min(devicePixelRatio, this.budget.dprCap)
-    return new DprGovernor(this.pixelRatio, { min: Math.min(this.budget.dprMin, max), max })
+    return { min: Math.min(this.budget.dprMin, max), max }
+  }
+
+  private createGovernor() {
+    return new DprGovernor(this.pixelRatio, this.policy())
   }
 
   private handleResize = () => {
     this.width = innerWidth
     this.height = innerHeight
-    this.pixelRatio = Math.min(this.pixelRatio, devicePixelRatio, this.budget.dprCap)
-    // The window may have moved to a display with a different pixel ratio.
-    this.governor = this.createGovernor()
+    // Most resizes (a phone's URL bar) keep the governor's state; a move to a display with
+    // another pixel ratio only changes its bounds.
+    const clamped = this.governor.setPolicy(this.policy())
+    if (clamped !== null) this.pixelRatio = clamped
     this.applySize()
   }
 
