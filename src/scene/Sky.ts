@@ -50,6 +50,7 @@ export class Sky {
         uSpaceMap: { value: spaceMap },
         uSpace: { value: 0 },
         uSun: { value: 0 },
+        uLimb: { value: 0 },
         uSunDir: { value: SUN_DIR.clone() },
         uHorizon: { value: new Color('#1a2b42') },
         uZenith: { value: new Color('#04070d') },
@@ -85,7 +86,7 @@ export class Sky {
     geo.setAttribute('position', new BufferAttribute(pos, 3))
     geo.setAttribute('aData', new BufferAttribute(data, 3))
     this.stars = new ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uSpace: { value: 0 }, uPixelRatio: { value: 1 } },
+      uniforms: { uTime: { value: 0 }, uSpace: { value: 0 }, uLimb: { value: 0 }, uPixelRatio: { value: 1 } },
       vertexShader: STAR_VERT,
       fragmentShader: STAR_FRAG,
       transparent: true,
@@ -108,6 +109,10 @@ export class Sky {
     this.group.position.copy(cameraPosition)
     this.dome.uniforms.uSpace.value = space
     this.dome.uniforms.uSun.value = orbit ? 1 : 0
+    // Climbing out of the pad world, the Earth's horizon appears below; in orbit the real planet does.
+    const limb = orbit ? 0 : Math.min(Math.max((space - 0.35) / 0.65, 0), 1)
+    this.dome.uniforms.uLimb.value = limb * limb * (3 - 2 * limb)
+    this.stars.uniforms.uLimb.value = this.dome.uniforms.uLimb.value
     this.stars.uniforms.uTime.value = time
     this.stars.uniforms.uSpace.value = space
   }
@@ -131,6 +136,7 @@ const DOME_FRAG = /* glsl */ `
 uniform sampler2D uSpaceMap;
 uniform float uSpace;
 uniform float uSun;
+uniform float uLimb;
 uniform vec3 uSunDir;
 uniform vec3 uHorizon;
 uniform vec3 uZenith;
@@ -151,6 +157,14 @@ void main() {
 
   vec3 space = vec3(0.0025, 0.0035, 0.006) + texture2D(uSpaceMap, equirectUv(d)).rgb / 8.0;
 
+  // Climbing out: the night Earth below a horizon that drops as we rise, with a thin
+  // airglow line along it (a circle of constant elevation is a sphere's horizon).
+  float dip = 0.03 + 0.17 * uLimb;
+  float x = (h + dip) / 0.01;
+  float earth = (1.0 - smoothstep(-dip - 0.003, -dip + 0.003, h)) * uLimb;
+  space = mix(space, vec3(0.0015, 0.002, 0.0035), earth);
+  space += vec3(0.22, 0.45, 1.0) * uLimb * (exp(-x * x) * 0.5 + exp(-max(h + dip, 0.0) / 0.05) * step(-dip, h) * 0.1);
+
   // Sun: tight disc, wide soft corona.
   float sd = max(dot(d, uSunDir), 0.0);
   space += uSun * (vec3(1.0, 0.96, 0.9) * pow(sd, 24000.0) * 40.0 + vec3(0.9, 0.86, 0.8) * (pow(sd, 2500.0) * 0.5 + pow(sd, 90.0) * 0.07 + pow(sd, 8.0) * 0.05));
@@ -165,6 +179,7 @@ const STAR_VERT = /* glsl */ `
 attribute vec3 aData;
 uniform float uTime;
 uniform float uSpace;
+uniform float uLimb;
 uniform float uPixelRatio;
 varying float vBright;
 varying vec3 vTint;
@@ -173,6 +188,9 @@ void main() {
   float tw = 0.75 + 0.25 * sin(uTime * (0.6 + aData.y * 2.4) + aData.z * 60.0);
   float horizonFade = smoothstep(-0.02, 0.18, normalize(position).y);
   float vis = mix(0.22 * horizonFade, 1.0, uSpace);
+  // Stars set behind the Earth's horizon during the climb (matches the dome).
+  float dip = 0.03 + 0.17 * uLimb;
+  vis *= 1.0 - (1.0 - smoothstep(-dip - 0.01, -dip + 0.01, normalize(position).y)) * uLimb;
   vBright = tw * vis * clamp(aData.x / 2.0, 0.35, 1.6);
   vTint = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.9, 0.78), aData.z);
   gl_PointSize = aData.x * uPixelRatio * mix(0.9, 1.25, uSpace);

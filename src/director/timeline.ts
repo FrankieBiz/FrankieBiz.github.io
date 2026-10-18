@@ -85,6 +85,10 @@ export function buildTimeline(state: DirectorState, layout: ActLayout, projectCo
     [k.ignitionStart, cam([15, 3.6, 24], [0, 6.2, 0], 34), 'power2.inOut'],
     [k.liftoff - 0.05, cam([8.6, 1.1, 13.8], [0, 4.6, 0], 36, 0, 0.02)],
     [k.liftoff + 0.6, cam([7.5, -1.2, 14.5], [0, 6.4, 0], 38, 0, 0.03)],
+    // Telephoto tracking shot from just above (style frame 03): the gravity turn reads as a
+    // diagonal and the Earth's horizon drops away below as the climb leaves the atmosphere.
+    [k.maxQ, cam([15, 6.8, 23], [0, 5.4, 0], 30, 0.12), 'power2.inOut'],
+    [k.meco, cam([13, 5.8, 21], [0, 6.0, 0], 31, 0.12), 'sine.inOut'],
     [k.swap - 0.01, cam([3.6, -7.5, 9.5], [0, 7.0, 0], 46, 0, 0.08)],
     // Orbit world — appears at the peak of the transition.
     [k.swap, cam([-23.5, 1.4, 5], [-13.5, 0.4, -6], 38), 'none'],
