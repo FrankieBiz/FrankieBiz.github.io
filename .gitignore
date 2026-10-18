@@ -6,3 +6,4 @@ dist
 qa-shots
 .superpowers/
 assets-src/
+__pycache__/
