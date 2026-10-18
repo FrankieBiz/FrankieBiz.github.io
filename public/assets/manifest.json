@@ -156,15 +156,15 @@
       "tiers": {
         "high": {
           "url": "assets/pad-high.glb",
-          "bytes": 295632
+          "bytes": 252792
         },
         "medium": {
           "url": "assets/pad-medium.glb",
-          "bytes": 295632
+          "bytes": 252792
         },
         "low": {
           "url": "assets/pad-low.glb",
-          "bytes": 295632
+          "bytes": 252792
         }
       }
     },
@@ -219,15 +219,15 @@
       "tiers": {
         "high": {
           "url": "assets/env-pad-high.hdr",
-          "bytes": 682047
+          "bytes": 681391
         },
         "medium": {
           "url": "assets/env-pad-medium.hdr",
-          "bytes": 202831
+          "bytes": 202702
         },
         "low": {
           "url": "assets/env-pad-low.hdr",
-          "bytes": 202831
+          "bytes": 202702
         }
       }
     },

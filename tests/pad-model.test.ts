@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Texture } from 'three'
+import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, SRGBColorSpace, Texture } from 'three'
 import { describe, expect, it } from 'vitest'
 import { armSwing, PadModel } from '../src/scene/PadModel'
 
@@ -66,6 +66,8 @@ describe('PadModel', () => {
     expect(ao.channel).toBe(1)
     expect(ao.repeat.y).toBe(-1)
     expect(ao.offset.y).toBe(1)
+    // Blender writes 8-bit bakes sRGB-encoded; decoding as linear would weaken the occlusion.
+    expect(ao.colorSpace).toBe(SRGBColorSpace)
     const tower = gltf.scene.getObjectByName('Tower') as Mesh
     expect((tower.material as MeshStandardMaterial).aoMap).toBe(ao)
   })

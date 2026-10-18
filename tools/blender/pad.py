@@ -206,11 +206,16 @@ def build_arm(index, level, mat_steel, mat_hose):
         common.assign(hose, mat_hose)
         arm = common.join([arm, hose], f"Arm_{index}")
     common.apply_transforms([arm])
-    # Pivot at the tower corner, local +X toward the rocket (rotation kept on the node).
-    arm.location = B(*pivot3)
+    arm.name = arm.data.name = f"Arm_{index}_Mesh"
+    # The site swings the Arm_i empty: hinge at the tower corner, local +X toward the rocket.
+    # The mesh hangs under it because compression (quantization) rewrites mesh node transforms.
+    pivot = bpy.data.objects.new(f"Arm_{index}", None)
+    bpy.context.scene.collection.objects.link(pivot)
+    pivot.location = B(*pivot3)
     to = Vector(B(0, level, 0)) - Vector(B(*pivot3))
-    arm.rotation_euler = (0, 0, math.atan2(to.y, to.x))
-    return arm
+    pivot.rotation_euler = (0, 0, math.atan2(to.y, to.x))
+    arm.parent = pivot
+    return pivot, arm
 
 
 # ---------------------------------------------------------------- floods
@@ -264,8 +269,12 @@ def build_flood(index, fx, fz, mat_steel, mat_lens):
 
 
 def unwrap_lightmap(obj, tile):
-    """Two UV sets: UVMap (smart project, for future textures) and Lightmap (packed into `tile`)."""
+    """Two UV sets: UVMap (smart project, for future textures) and Lightmap (packed into `tile`).
+    The lightmap must be the second set (glTF TEXCOORD_1, three's uv1) for aoMap.channel = 1."""
     mesh = obj.data
+    # Joined primitives arrive with their own UV maps; start clean so no stray set comes first.
+    while mesh.uv_layers:
+        mesh.uv_layers.remove(mesh.uv_layers[0])
     mesh.uv_layers.new(name="UVMap")
     mesh.uv_layers.new(name="Lightmap")
     bpy.ops.object.select_all(action="DESELECT")
@@ -315,7 +324,7 @@ def main():
     tower, beacon = build_tower()
     common.assign(tower, mat_steel)
     mount = build_mount()
-    arms = [build_arm(i, level, mat_steel, mat_hose) for i, level in enumerate(ARM_LEVELS)]
+    arms = [part for i, level in enumerate(ARM_LEVELS) for part in build_arm(i, level, mat_steel, mat_hose)]
     floods, lenses = zip(*[build_flood(i, fx, fz, mat_steel, mat_lens) for i, (fx, fz) in enumerate(FLOODS)])
     baked = [tower, mount, *floods]
     exported = [*baked, *arms, *lenses, beacon]

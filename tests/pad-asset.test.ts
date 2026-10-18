@@ -47,10 +47,23 @@ describe('authored launch pad asset', () => {
     })
   })
 
-  it('carries a second UV set on baked parts for the AO atlas', () => {
-    for (const name of ['Tower', 'Mount']) {
+  it('puts the AO atlas UVs in TEXCOORD_1, inside each part\'s tile', () => {
+    // Tiles from pad.py unwrap_lightmap, in glTF UV space (v = 0 at the top of the image).
+    const tiles: Record<string, [number, number, number, number]> = {
+      Tower: [0, 0, 0.5, 1],
+      Mount: [0.5, 0, 1, 0.5],
+    }
+    for (const [name, [u0, v0, u1, v1]] of Object.entries(tiles)) {
       const prim = node(name)!.getMesh()!.listPrimitives()[0]
-      expect(prim.getAttribute('TEXCOORD_1'), name).not.toBeNull()
+      // Exactly two UV sets: three samples aoMap from uv1, so a stray extra set would shadow it.
+      expect(prim.listSemantics().filter((s) => s.startsWith('TEXCOORD')), name).toEqual(['TEXCOORD_0', 'TEXCOORD_1'])
+      const uv = prim.getAttribute('TEXCOORD_1')!
+      const [minU, minV] = uv.getMin([])
+      const [maxU, maxV] = uv.getMax([])
+      expect(minU, `${name} u min`).toBeGreaterThanOrEqual(u0 - 1e-3)
+      expect(maxU, `${name} u max`).toBeLessThanOrEqual(u1 + 1e-3)
+      expect(minV, `${name} v min`).toBeGreaterThanOrEqual(v0 - 1e-3)
+      expect(maxV, `${name} v max`).toBeLessThanOrEqual(v1 + 1e-3)
     }
   })
 
@@ -69,5 +82,26 @@ describe('authored launch pad asset', () => {
   it('ships the baked AO atlas and the ground contact-shadow map', () => {
     expect(existsSync('assets-src/blender/pad-ao.png')).toBe(true)
     expect(existsSync('assets-src/blender/ground-ao.png')).toBe(true)
+  })
+})
+
+describe('built (compressed) pad asset', () => {
+  it('keeps each access arm pivoting on its tower hinge after compression', async () => {
+    const { ALL_EXTENSIONS } = await import('@gltf-transform/extensions')
+    const { MeshoptDecoder } = await import('meshoptimizer')
+    await MeshoptDecoder.ready
+    const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder })
+    for (const tier of ['high', 'low']) {
+      const built = await io.read(`public/assets/pad-${tier}.glb`)
+      ARM_LEVELS.forEach((level, i) => {
+        // Quantization folds offsets into mesh node transforms; the node the site rotates must not move.
+        const arm = built.getRoot().listNodes().find((n) => n.getName() === `Arm_${i}`)!
+        const [tx, ty, tz] = arm.getTranslation()
+        expect(tx, `${tier} Arm_${i} x`).toBeCloseTo(TOWER.x + TOWER.half, 2)
+        expect(ty, `${tier} Arm_${i} y`).toBeCloseTo(level, 2)
+        expect(tz, `${tier} Arm_${i} z`).toBeCloseTo(TOWER.z + TOWER.half, 2)
+        for (const s of arm.getScale()) expect(s, `${tier} Arm_${i} scale`).toBeCloseTo(1, 4)
+      })
+    }
   })
 })

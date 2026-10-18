@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial, Object3D, Texture } from 'three'
+import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial, Object3D, SRGBColorSpace, Texture } from 'three'
 import { describe, expect, it } from 'vitest'
 import { RocketModel } from '../src/scene/RocketModel'
 
@@ -43,6 +43,12 @@ describe('RocketModel', () => {
       expect(t.repeat.y).toBe(-1)
       expect(t.offset.y).toBe(1)
     }
+  })
+
+  it('decodes the baked AO as sRGB (Blender writes 8-bit bakes sRGB-encoded)', () => {
+    const ao = new Texture()
+    RocketModel.fromGltf(fakeRocketScene(), paint(), ao, false)
+    expect(ao.colorSpace).toBe(SRGBColorSpace)
   })
 
   it('heats the engine bell under thrust', () => {

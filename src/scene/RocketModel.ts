@@ -1,4 +1,4 @@
-import { Color, DoubleSide, Group, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, type Object3D, type Texture } from 'three'
+import { Color, DoubleSide, Group, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, SRGBColorSpace, type Object3D, type Texture } from 'three'
 import type { HullTextures } from './textures'
 
 /** What the rest of the scene needs from a rocket (procedural or authored). */
@@ -47,6 +47,8 @@ export class RocketModel implements RocketLike {
       texture.repeat.y = -1
       texture.offset.y = 1
     }
+    // Blender writes 8-bit bakes sRGB-encoded.
+    if (ao) ao.colorSpace = SRGBColorSpace
     hull.material = new MeshPhysicalMaterial({
       map: paint.map,
       roughnessMap: paint.roughness,

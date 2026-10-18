@@ -1,4 +1,4 @@
-import { Mesh, MeshStandardMaterial, type Material, type Object3D, type Texture } from 'three'
+import { Mesh, MeshStandardMaterial, SRGBColorSpace, type Material, type Object3D, type Texture } from 'three'
 
 /** Arm retraction in radians for overall progress 0..1; the lowest arm leads. */
 export function armSwing(progress: number, index: number): number {
@@ -37,9 +37,11 @@ export class PadModel {
 
     if (ao) {
       // Baked on the "Lightmap" UV set (TEXCOORD_1); glTF UVs have a top-left origin.
+      // Blender writes 8-bit bakes sRGB-encoded.
       ao.channel = 1
       ao.repeat.y = -1
       ao.offset.y = 1
+      ao.colorSpace = SRGBColorSpace
     }
     for (const name of BAKED) {
       find(name)?.traverse((o) => {
