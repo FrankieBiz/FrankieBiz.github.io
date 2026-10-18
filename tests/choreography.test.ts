@@ -86,6 +86,20 @@ describe('master timeline', () => {
     expect(snapshot(b)).toEqual(snapshot(a))
   })
 
+  it('pulls focus on close-ups and keeps wide shots and the climb in deep focus', () => {
+    const state = createState()
+    const tl = buildTimeline(state, layout, N)
+    const at = (t: number) => {
+      tl.time(t)
+      return state.dofAmount
+    }
+    expect(at(0)).toBe(0) // hero: everything sharp
+    expect(at(k.manifestoStart + 1.0)).toBeGreaterThan(0.5) // crane close-up on the hull
+    expect(at(k.liftoff + 0.8)).toBeLessThanOrEqual(0.2) // climb: keep the flame crisp
+    expect(at(k.moduleStart(0) + 0.8)).toBeGreaterThan(0.5) // capsule dwell
+    expect(at(layout.scrollable)).toBeGreaterThan(0) // contact
+  })
+
   it('counts down before liftoff and up after it', () => {
     const state = createState()
     const tl = buildTimeline(state, layout, N)

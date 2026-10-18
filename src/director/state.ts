@@ -44,6 +44,8 @@ export interface DirectorState {
   focus: number
   /** Contact particles: scattered (0) → formed (1). */
   assemble: number
+  /** Depth-of-field strength (0 = deep focus). Focus follows the camera's look-at point. */
+  dofAmount: number
   /** Mission clock in seconds relative to liftoff. */
   missionT: number
   /** Telemetry readouts. */
@@ -67,6 +69,7 @@ export function createState(): DirectorState {
     warp: 0,
     focus: -1,
     assemble: 0,
+    dofAmount: 0,
     missionT: -600,
     altKm: 0,
     velMs: 0,

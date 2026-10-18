@@ -33,6 +33,11 @@ export class CameraRig {
     return this.width / this.height
   }
 
+  /** The point the camera is looking at this frame (after rocket follow) — the focus target. */
+  get focusPoint(): Vector3 {
+    return this.target
+  }
+
   /** `minY` keeps the camera above the ground in the pad world. */
   update(time: number, state: DirectorState, pointer: Pointer, follow: Vector3, minY = -Infinity) {
     const c = state.cam

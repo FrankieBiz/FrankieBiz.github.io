@@ -182,6 +182,23 @@ export function buildTimeline(state: DirectorState, layout: ActLayout, projectCo
   focus.push([k.contactStart + 0.5, -1, 'power2.in'])
   track(state, 'focus', focus)
 
+  // Focus pulls: close-ups and dwells go shallow; wide shots and the climb stay deep.
+  track(state, 'dofAmount', [
+    [0.25, 0],
+    [k.padEnd, 0.25, 'sine.inOut'],
+    [k.manifestoStart + 0.6, 0.85, 'sine.inOut'],
+    [k.launchStart - 0.2, 0.85],
+    [k.launchStart + 0.4, 0.15, 'sine.inOut'],
+    [k.liftoff, 0.1],
+    [k.liftoff + 0.6, 0, 'sine.inOut'],
+    [k.swap, 0],
+    [k.swap + 0.001, 0.35],
+    [k.moduleStart(0), 0.4],
+    [k.moduleStart(0) + 0.45, 0.9, 'sine.inOut'],
+    [k.contactStart, 0.9],
+    [k.contactStart + 0.6, 0.5, 'sine.inOut'],
+  ])
+
   track(state, 'assemble', [
     [k.contactStart + 0.1, 0],
     [k.contactStart + 0.8, 1, 'power2.out'],

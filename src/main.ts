@@ -225,7 +225,11 @@ async function boot() {
     await nextFrame()
 
     const AOPass = (await aoModule)?.N8AOPostPass
-    post = new PostFX(renderer.gl, world.scene, world.rig.camera, quality.budget, gradeAssets(loaded.ok ? loaded.assets : new Map()), AOPass)
+    post = new PostFX(renderer.gl, world.scene, world.rig.camera, quality.budget, {
+      grade: gradeAssets(loaded.ok ? loaded.assets : new Map()),
+      AOPass,
+      depthOfField: !reduced,
+    })
     const r = renderer
     const w = world
     const p = post
@@ -284,6 +288,7 @@ async function boot() {
     world.update(dt, t, state, pointer)
     renderer.gl.info.reset()
 
+    post.setFocus(world.rig.focusPoint, state.dofAmount)
     const warp = warpIntensity(state.warp)
     post.lens.amount = reduced ? 0 : Math.max(intro.amount, warp)
     veil.style.opacity = reduced ? String(warp) : '0'

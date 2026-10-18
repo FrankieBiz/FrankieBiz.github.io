@@ -1,6 +1,7 @@
 import {
   BlendFunction,
   BloomEffect,
+  DepthOfFieldEffect,
   EffectComposer,
   EffectPass,
   LUT3DEffect,
@@ -13,7 +14,7 @@ import {
   type Effect,
 } from 'postprocessing'
 import type { N8AOPostPass } from 'n8ao'
-import { Color, HalfFloatType, type Camera, type Scene, type WebGLRenderer } from 'three'
+import { Color, HalfFloatType, Vector3, type Camera, type Scene, type WebGLRenderer } from 'three'
 import type { QualityBudget } from '../core/Quality'
 import { LensDirtEffect, StreakPass, type GradeAssets } from './Grade'
 import { LensEffect } from './LensEffect'
@@ -24,27 +25,28 @@ import { LensEffect } from './LensEffect'
  * tone-mapped image. The lens effect samples its input directly, so anything
  * that must survive it comes after it in the pass.
  */
+export interface PostFXOptions {
+  grade?: GradeAssets
+  /** The lazily imported N8AO pass class; without it AO stays off and MSAA stays on. */
+  AOPass?: typeof N8AOPostPass
+  /** Focus pulls (off under reduced motion). */
+  depthOfField?: boolean
+}
+
 export class PostFX {
   readonly composer: EffectComposer
   readonly lens: LensEffect
   private renderPass: RenderPass
   private aoPass: N8AOPostPass | null = null
+  private dof: DepthOfFieldEffect | null = null
+  private dofPass: EffectPass | null = null
+  private maxBokeh: number
   private bloomPass: EffectPass
   private finishPass: EffectPass
   private aaPass: EffectPass | null = null
 
-  /**
-   * `AOPass` is the lazily imported N8AO pass class (only fetched on tiers that
-   * use ambient occlusion); without it AO stays off and MSAA stays on.
-   */
-  constructor(
-    renderer: WebGLRenderer,
-    scene: Scene,
-    camera: Camera,
-    budget: QualityBudget,
-    grade: GradeAssets = {},
-    AOPass?: typeof N8AOPostPass,
-  ) {
+  constructor(renderer: WebGLRenderer, scene: Scene, camera: Camera, budget: QualityBudget, options: PostFXOptions = {}) {
+    const { grade = {}, AOPass } = options
     // Ambient occlusion can't read multisampled depth, so AO tiers swap MSAA for SMAA.
     const ao = budget.ao !== 'off' && AOPass !== undefined
     this.composer = new EffectComposer(renderer, { frameBufferType: HalfFloatType, multisampling: ao ? 0 : budget.msaa })
@@ -62,6 +64,16 @@ export class PostFX {
         depthAwareUpsampling: true,
       })
       this.composer.addPass(this.aoPass)
+    }
+
+    // Depth of field runs on the HDR image before bloom, so out-of-focus highlights bloom naturally.
+    this.maxBokeh = budget.tier === 'high' ? 2.6 : 1.8
+    if (options.depthOfField && budget.tier !== 'low') {
+      this.dof = new DepthOfFieldEffect(camera, { focusDistance: 10, focusRange: 4, bokehScale: 0, resolutionScale: budget.tier === 'high' ? 0.75 : 0.5 })
+      this.dof.target = new Vector3()
+      this.dofPass = new EffectPass(camera, this.dof)
+      this.dofPass.enabled = false
+      this.composer.addPass(this.dofPass)
     }
 
     const tone = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC })
@@ -99,8 +111,18 @@ export class PostFX {
     }
   }
 
+  /** Autofocus on `point` with blur strength `amount` (0..1); the pass sleeps at 0. */
+  setFocus(point: Vector3, amount: number) {
+    if (!this.dof || !this.dofPass) return
+    this.dofPass.enabled = amount > 0.01
+    if (!this.dofPass.enabled) return
+    this.dof.target!.copy(point)
+    this.dof.bokehScale = amount * this.maxBokeh
+  }
+
   setCamera(camera: Camera) {
     this.renderPass.mainCamera = camera
+    if (this.dofPass) this.dofPass.mainCamera = camera
     this.bloomPass.mainCamera = camera
     this.finishPass.mainCamera = camera
     if (this.aaPass) this.aaPass.mainCamera = camera

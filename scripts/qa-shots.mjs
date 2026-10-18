@@ -45,7 +45,17 @@ for (const vu of checkpoints) {
     if (window.__mission) window.__mission.scroll.jumpTo(v)
     else window.scrollTo(0, v * innerHeight)
   }, vu)
-  await page.waitForTimeout(2500)
+  // Wait for real rendered frames (software GL can take ~1 s per frame), then let
+  // CSS transitions (≤ 1.1 s) finish before capturing.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        let n = 0
+        const step = () => (++n >= 6 ? resolve() : requestAnimationFrame(step))
+        requestAnimationFrame(step)
+      }),
+  )
+  await page.waitForTimeout(1400)
   const name = `${outDir}/vu-${vu.toFixed(2).padStart(5, '0')}.png`
   await page.screenshot({ path: name, timeout: 120000 })
   const texts = await page.evaluate(() =>
