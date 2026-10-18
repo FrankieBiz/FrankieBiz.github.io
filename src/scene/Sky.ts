@@ -29,7 +29,7 @@ vec4 bake(vec3 d) {
 `
 
 /** Direction toward the sun in the orbit world (low over the planet limb). */
-export const SUN_DIR = new Vector3(0.75, 0.16, -1).normalize()
+export const SUN_DIR = new Vector3(0.27, 0.07, -1).normalize()
 const SPACE_HORIZON = new Color('#020305')
 
 /**

@@ -194,8 +194,9 @@ export function buildTimeline(state: DirectorState, layout: ActLayout, projectCo
     [k.swap, 0],
     [k.swap + 0.001, 0.35],
     [k.moduleStart(0), 0.4],
-    [k.moduleStart(0) + 0.45, 0.9, 'sine.inOut'],
-    [k.contactStart, 0.9],
+    // Softer than the pad close-ups: the raised Earth sits near enough to bloom into big bokeh.
+    [k.moduleStart(0) + 0.45, 0.6, 'sine.inOut'],
+    [k.contactStart, 0.6],
     [k.contactStart + 0.6, 0.5, 'sine.inOut'],
   ])
 

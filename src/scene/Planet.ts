@@ -16,7 +16,7 @@ import type { PlanetTextures } from './planetTextures'
 import { SUN_DIR } from './Sky'
 
 export const PLANET_RADIUS = 150
-export const PLANET_CENTER = new Vector3(40, -172, -95)
+export const PLANET_CENTER = new Vector3(40, -153, -95)
 
 /** Surface fields baked once: R land, G highlands, B ice, A city lights. */
 const SURFACE_BAKE = /* glsl */ `
