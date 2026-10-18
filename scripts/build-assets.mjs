@@ -1,13 +1,14 @@
 // Builds shipped assets from assets-src/ into public/assets/ — one variant per
 // quality tier — and writes public/assets/manifest.json with real sizes.
-// Sources that don't exist yet are skipped, so the pipeline grows task by task.
+// Sources are gitignored, so a machine may hold only some: assets without a source
+// keep their previous build (if its files are still there) instead of being wiped.
 // Usage: npm run assets
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import sharp from 'sharp'
 import { cloudDensity, isWater, nightIntensity } from '../src/assets/earthMaps.ts'
-import { validateManifest } from '../src/assets/manifest.ts'
+import { mergeManifest, staleFiles, validateManifest } from '../src/assets/manifest.ts'
 
 const SRC = 'assets-src'
 const OUT = 'public/assets'
@@ -133,14 +134,24 @@ function copyPerTier(asset, tier) {
 
 const sourceExists = (asset) => existsSync(join(SRC, asset.src.replace('{tier}', 'high')))
 
+/** The manifest from the last build, if there is a valid one. */
+function previousManifest() {
+  try {
+    const manifest = JSON.parse(readFileSync(join(OUT, 'manifest.json'), 'utf8'))
+    return validateManifest(manifest).length ? null : manifest
+  } catch {
+    return null
+  }
+}
+
 async function main() {
-  // Clear the files, not the folder: deleting the folder confuses the dev server's public-file watcher.
   mkdirSync(OUT, { recursive: true })
-  for (const file of readdirSync(OUT)) rmSync(join(OUT, file), { recursive: true, force: true })
-  const manifest = { version: 1, assets: [] }
+  const previous = previousManifest()
+  const rebuilt = []
   for (const asset of ASSETS) {
     if (!sourceExists(asset)) {
-      console.warn(`skip ${asset.id}: ${join(SRC, asset.src)} not found`)
+      const kept = previous?.assets.some((a) => a.id === asset.id)
+      console.warn(`${kept ? 'keep' : 'skip'} ${asset.id}: ${join(SRC, asset.src)} not found${kept ? '; previous build kept' : ''}`)
       continue
     }
     const tiers = {}
@@ -148,8 +159,12 @@ async function main() {
       tiers[tier] =
         asset.kind === 'texture' ? await buildTexture(asset, tier) : asset.kind === 'gltf' ? buildGltf(asset, tier) : copyPerTier(asset, tier)
     }
-    manifest.assets.push({ id: asset.id, kind: asset.kind, required: asset.required ?? false, tiers })
+    rebuilt.push({ id: asset.id, kind: asset.kind, required: asset.required ?? false, tiers })
   }
+  const manifest = mergeManifest(previous, rebuilt, ASSETS.map((a) => a.id), (url) => existsSync(join('public', url)))
+  // Remove outputs nothing references (renamed or retired assets). Files, not the folder:
+  // deleting the folder confuses the dev server's public-file watcher.
+  for (const file of staleFiles(readdirSync(OUT), manifest)) rmSync(join(OUT, file), { recursive: true, force: true })
 
   writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 

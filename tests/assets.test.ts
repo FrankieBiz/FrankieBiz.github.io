@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectTier, validateManifest, type AssetManifest } from '../src/assets/manifest'
+import { mergeManifest, selectTier, staleFiles, validateManifest, type AssetManifest, type AssetRecord } from '../src/assets/manifest'
 import { loadAssets } from '../src/assets/load'
 
 const variant = (url: string, bytes: number, width?: number) => ({ url, bytes, width })
@@ -135,5 +135,40 @@ describe('asset loader', () => {
     const result = await loadAssets([], { fetch: fakeFetch({}), decode, onProgress: (p) => progress.push(p) })
     expect(result.ok).toBe(true)
     expect(progress).toEqual([1])
+  })
+})
+
+describe('partial asset rebuilds', () => {
+  const variant = (file: string) => ({ url: `assets/${file}`, bytes: 10 })
+  const record = (id: string, stamp = ''): AssetRecord => ({
+    id,
+    kind: 'texture',
+    required: false,
+    tiers: { high: variant(`${id}-high${stamp}.webp`), medium: variant(`${id}-medium${stamp}.webp`), low: variant(`${id}-low${stamp}.webp`) },
+  })
+  const previous: AssetManifest = { version: 1, assets: [record('earth-day'), record('rocket'), record('retired')] }
+
+  it('keeps the previous build of assets whose sources are absent on this machine', () => {
+    const merged = mergeManifest(previous, [record('rocket', '-new')], ['earth-day', 'rocket'], () => true)
+    expect(merged.assets.map((a) => a.id)).toEqual(['earth-day', 'rocket'])
+    expect(merged.assets[0]).toEqual(record('earth-day'))
+    expect(merged.assets[1].tiers.high.url).toBe('assets/rocket-high-new.webp')
+  })
+
+  it('drops kept entries whose files are gone, and assets no longer defined', () => {
+    const merged = mergeManifest(previous, [], ['earth-day', 'rocket'], (url) => !url.includes('earth-day'))
+    expect(merged.assets.map((a) => a.id)).toEqual(['rocket'])
+  })
+
+  it('works with no previous manifest', () => {
+    expect(mergeManifest(null, [record('rocket')], ['earth-day', 'rocket'], () => true).assets.map((a) => a.id)).toEqual(['rocket'])
+  })
+
+  it('names only unreferenced files as stale, never the manifest or kept outputs', () => {
+    const merged = mergeManifest(previous, [], ['earth-day'], () => true)
+    expect(staleFiles(['manifest.json', 'earth-day-high.webp', 'earth-day-medium.webp', 'earth-day-low.webp', 'retired-high.webp', 'old.glb'], merged)).toEqual([
+      'retired-high.webp',
+      'old.glb',
+    ])
   })
 })

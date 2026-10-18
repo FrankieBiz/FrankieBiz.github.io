@@ -78,3 +78,32 @@ export interface AssetRequest {
 export function selectTier(manifest: AssetManifest, tier: Tier): AssetRequest[] {
   return manifest.assets.map((a) => ({ id: a.id, kind: a.kind, required: a.required, url: a.tiers[tier].url, bytes: a.tiers[tier].bytes }))
 }
+
+/**
+ * The manifest after a (possibly partial) asset build. Sources are gitignored, so a
+ * machine may hold only some of them: assets that weren't rebuilt keep their previous
+ * entry as long as its files still exist. Order follows `order` (the asset list).
+ */
+export function mergeManifest(
+  previous: AssetManifest | null,
+  rebuilt: AssetRecord[],
+  order: string[],
+  exists: (url: string) => boolean,
+): AssetManifest {
+  const fresh = new Map(rebuilt.map((a) => [a.id, a]))
+  const kept = new Map((previous?.assets ?? []).map((a) => [a.id, a]))
+  const assets: AssetRecord[] = []
+  for (const id of order) {
+    const asset = fresh.get(id) ?? kept.get(id)
+    if (!asset) continue
+    if (!fresh.has(id) && !Object.values(asset.tiers).every((v) => exists(v.url))) continue
+    assets.push(asset)
+  }
+  return { version: 1, assets }
+}
+
+/** Files in the output folder that no manifest entry references (safe to delete). */
+export function staleFiles(files: string[], manifest: AssetManifest): string[] {
+  const referenced = new Set(manifest.assets.flatMap((a) => Object.values(a.tiers).map((v) => v.url.split('/').pop())))
+  return files.filter((f) => f !== 'manifest.json' && !referenced.has(f))
+}
