@@ -5,7 +5,12 @@ pad, ignition and ascent, a transition through the atmosphere, then orbit,
 where each project is a glass payload module, and a contact section where
 particles reshape around each link.
 
-Everything visual is procedural (no image, model or audio files).
+The rocket, launch pad and tower are modelled by scripts in headless Blender,
+with baked ambient occlusion. The exhaust smoke is a simulated Mantaflow flipbook,
+the pad's reflections come from an environment path-traced in Blender, and the
+Earth is built from NASA imagery. Each of these assets is optional: if one fails
+to load, the site falls back to its procedural version, so a bad network never
+blanks the page. Sound is generated live (there are no audio files).
 
 ## Run it
 
@@ -14,10 +19,32 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build into dist/
 npm run preview    # serve dist/ locally
-npm test           # unit tests (choreography, scramble, telemetry, quality tiers, manifest)
+npm test           # unit tests (choreography, quality tiers, assets, shaders, flipbook, …)
 ```
 
-Requires Node 22.12+.
+Requires Node 22.12+. The built assets are committed (`public/assets/`), so none of
+the asset tooling below is needed just to run or deploy the site.
+
+## Assets
+
+Sources live in `assets-src/` (gitignored); `npm run assets` turns them into
+per-tier files in `public/assets/` (WebP textures, meshopt-compressed GLB, HDR) plus
+`manifest.json` with their real sizes. Steps to regenerate everything from scratch:
+
+```bash
+npm run assets:fetch                                    # NASA Earth imagery (~45 MB of sources)
+npm run assets:grade                                    # colour-grade LUT + lens dirt (needs uv)
+npm run assets:blender -- tools/blender/rocket.py       # rocket GLB + baked hull AO
+npm run assets:blender -- tools/blender/pad.py          # tower, mount, arms, floods + AO atlas + ground contact shadows
+npm run assets:blender -- tools/blender/environment.py  # pad environment HDR (needs pad.glb)
+npm run assets:blender -- tools/blender/smoke.py        # Mantaflow smoke flipbook (~15 min, CPU)
+npm run assets                                          # build public/assets + manifest
+```
+
+Blender runs headless (`blender` on PATH, or the Flatpak `org.blender.Blender`);
+each script also writes a `.blend` and a preview render next to its outputs.
+Per-tier download budgets (high 15 MB, medium 10 MB, low 6 MB) are enforced by the
+manifest validation; the first-load JavaScript budget (300 KB gzip) by `npm run build`.
 
 ## Swap the placeholders
 
@@ -49,10 +76,22 @@ npm run qa -- --only=4.6,8.6                # specific scroll positions (in view
 ```
 
 Screenshots use software rendering (SwiftShader), so they're slow and the FPS
-shown is not representative of real hardware.
+shown is not representative of real hardware. SwiftShader also hides driver-specific
+shader bugs (a NaN that blacked out frames on Intel/Mesa never showed there), so
+check on the machine's real GPU too:
+
+```bash
+node scripts/qa-perf.mjs          # fps, p95 frame time and adaptive DPR per tier × act
+node scripts/qa-gpu.mjs           # GPU ms per post pass + scene cost per group (timer queries)
+node scripts/qa-gpu-sanity.mjs    # whole timeline: NaN pixels and black frames (exits 1 on any)
+```
+
+`qa-gpu` samples the Intel GPU clock where the driver exposes it, because laptop
+GPUs throttle under sustained load and skew back-to-back numbers.
 
 Behavioural checks (navigation, keyboard, focus, sound, contact morphs, resize,
-GPU resource stability, console errors, and an optional axe accessibility scan):
+GPU resource stability, console errors, blocked and slow assets, reduced motion,
+lost WebGL context, and an optional axe accessibility scan):
 
 ```bash
 node scripts/qa-interact.mjs
@@ -90,13 +129,29 @@ After the first deploy, change `og:image` in `index.html` to the absolute URL
 ```
 src/
   content/     site copy + project manifest (edit these)
-  core/        renderer, loop, scroll, pointer, quality tiers, generative audio
+  assets/      manifest, streaming loader, decoders (glTF, HDR, LUT, textures)
+  core/        renderer + adaptive resolution, loop, scroll, pointer, quality tiers, audio
   director/    act layout, shared state, the scroll-scrubbed GSAP timeline
-  scene/       rocket, pad, exhaust, sky, planet, payloads, particle field, camera
-  post/        bloom + tone mapping, lens/transition effect, vignette, grain
+  scene/       rocket, pad, exhaust, smoke flipbook, fog, sparks, sky, planet, payloads,
+               particle field, camera
+  post/        AO, depth of field, light shafts, bloom + tone mapping, lens, grade, grain
   ui/          DOM rendering, loader, HUD, beat-driven reveals, text scramble, cursor
+tools/blender/ headless Blender scripts for the authored assets
+scripts/       asset build, bundle budget, visual / behavioural / real-GPU QA
+docs/          design spec, plans, style-frame notes
 ```
 
 The scroll position (in viewport units) drives a paused GSAP timeline that
 writes plain numbers into one state object; scene systems, post-processing and
 the HUD only read it. All choreography lives in `src/director/timeline.ts`.
+
+## Credits
+
+- Earth imagery: NASA Earth Observatory, public domain. Sources are Blue Marble Next
+  Generation (July), Black Marble 2016 and the cloud composite.
+- Built with [three.js](https://threejs.org), [postprocessing](https://github.com/pmndrs/postprocessing),
+  [N8AO](https://github.com/N8python/n8ao), [GSAP](https://gsap.com) and [Lenis](https://lenis.darkroom.engineering).
+  Fonts: Archivo and Geist Mono (via Fontsource).
+- The rocket, pad, environment and smoke assets are original, generated by the scripts
+  in `tools/blender/`. The style frames used for art direction (`docs/style-frames/`)
+  are reference only and aren't shipped.

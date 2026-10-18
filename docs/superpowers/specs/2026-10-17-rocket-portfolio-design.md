@@ -207,3 +207,41 @@ for it is provided at handoff. Favicon is a minimal geometric SVG mark.
   the name for assistive tech.
 - **Keyboard access.** All copy stays in the accessibility tree; focusing an
   element in an inactive beat flies the scroll to that beat.
+
+### Photoreal art pass (2026-10-17 → 18)
+
+Plan: `docs/superpowers/plans/2026-10-17-photoreal-art-pass.md`; tuning record:
+`docs/style-frames/COMPARE.md`.
+
+- **Authored assets, procedural fallbacks.** The rocket, pad structures, pad
+  environment and smoke are built by scripts in headless Blender
+  (`tools/blender/`), and the Earth uses NASA imagery. Each asset is optional: the
+  procedural version stays as the fallback, and QA checks that blocked or slow
+  assets still boot.
+- **Names are the contract.** The site drives authored parts by node name (hull,
+  nozzle exit, arm hinges, beacon). Compression keeps the hierarchy, and moving
+  parts hang under hinge empties because quantization rewrites mesh node
+  transforms. Tests read the built GLBs.
+- **Painted markings stay in the browser.** Blender supplies geometry and baked
+  AO. The lettering stays canvas-drawn, so it's crisp and editable in one place.
+- **Environment: pad rendered, orbit captured.** The pad reflects an HDR
+  path-traced from inside the launch site. The orbit environment is captured at
+  startup from the orbit world itself, so the planet in reflections matches the
+  screen and costs nothing to download.
+- **Smoke as one relightable flipbook.** A Mantaflow puff is rendered under light
+  from above, below and behind and packed into one 8×8 atlas. The shader relights
+  it live, so the engine glows up through the steam. Frames are
+  density-normalised, and the particles fade over their life as before.
+- **Performance measured on the target machine.** Medium is the auto-selected
+  tier on the owner's Intel iGPU. Real-GPU tooling (timer queries, GPU clock
+  sampling) found these fixes:
+  - full-resolution internals in depth of field;
+  - N8AO re-rendering every transparent object;
+  - AO running in orbit;
+  - an oscillating resolution controller (replaced by `DprGovernor`).
+
+  Every act now holds 60 fps at DPR 1.5, even under the package power limit.
+- **GLSL undefined behaviour is linted.** `pow()` of a value that could go
+  negative turned into NaN on Mesa, and bloom spread one pixel to a black frame.
+  Every such base is now clamped, a test enforces it, and bloom's input is
+  sanitised.
