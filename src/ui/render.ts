@@ -166,7 +166,7 @@ export function renderSections(main: HTMLElement, site: typeof Site, projects: r
         { class: 'footer' },
         el('span', {}, `© ${year} ${fullName}`),
         el('button', { class: 'footer__top', type: 'button', 'data-action': 'top', 'data-cursor': '' }, 'Return to pad'),
-        el('span', {}, 'Built with Three.js'),
+        el('span', {}, 'Built with Three.js. Earth imagery: NASA Earth Observatory'),
       ),
     ),
   )

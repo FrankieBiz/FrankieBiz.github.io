@@ -12,7 +12,8 @@ export function createDecoder(): LoadOptions['decode'] {
     switch (kind) {
       case 'texture': {
         // Decode off the main thread; flip at decode time so three doesn't have to.
-        const bitmap = await createImageBitmap(new Blob([buffer]), { imageOrientation: 'flipY' })
+        // No premultiply / colour management: some textures carry data (masks) in their channels.
+        const bitmap = await createImageBitmap(new Blob([buffer]), { imageOrientation: 'flipY', premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
         const texture = new Texture(bitmap)
         texture.flipY = false
         texture.needsUpdate = true

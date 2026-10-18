@@ -49,7 +49,11 @@ async function loadFonts() {
 async function fetchManifest(): Promise<AssetManifest> {
   try {
     const response = await fetch('assets/manifest.json', { cache: 'no-cache' })
-    if (!response.ok) return EMPTY_MANIFEST
+    const isJson = response.headers.get('content-type')?.includes('json')
+    if (!response.ok || !isJson) {
+      if (import.meta.env.DEV) console.info('[assets] no manifest served; using the procedural scene. Run `npm run assets`.')
+      return EMPTY_MANIFEST
+    }
     const manifest = (await response.json()) as AssetManifest
     const problems = validateManifest(manifest)
     if (problems.length) {
@@ -213,7 +217,7 @@ async function boot() {
     loader.progress = 0.55
     await nextFrame()
 
-    world = new World(renderer.gl, quality, projects, site.name)
+    world = new World(renderer.gl, quality, projects, site.name, loaded.ok ? loaded.assets : new Map())
     loader.progress = 0.7
     await nextFrame()
 

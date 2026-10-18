@@ -1,5 +1,18 @@
-import { AdditiveBlending, BackSide, Color, Group, Mesh, ShaderMaterial, SphereGeometry, Vector3, type WebGLRenderer } from 'three'
+import {
+  AdditiveBlending,
+  BackSide,
+  Color,
+  Group,
+  Matrix4,
+  Mesh,
+  ShaderMaterial,
+  SphereGeometry,
+  SRGBColorSpace,
+  Vector3,
+  type WebGLRenderer,
+} from 'three'
 import { bakeEquirect, EQUIRECT_UV } from './bake'
+import type { PlanetTextures } from './planetTextures'
 import { SUN_DIR } from './Sky'
 
 export const PLANET_RADIUS = 150
@@ -25,19 +38,93 @@ vec4 bake(vec3 p) {
 }
 `
 
+/** Where the camera path looks down onto the globe, and which way is "up-screen". */
+const FOCAL_POINT = new Vector3(20, 0, 8)
+/** The place on Earth under the focal point: southern Italy, looking north over Europe at night. */
+const FOCAL_LAT = 40
+const FOCAL_LON = 15
+
+/** Unit direction on a three.js SphereGeometry for a latitude/longitude (matches equirect UVs). */
+export function latLonToLocal(lat: number, lon: number): Vector3 {
+  const phi = ((lon + 180) / 360) * Math.PI * 2
+  const theta = ((90 - lat) / 180) * Math.PI
+  return new Vector3(-Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta))
+}
+
+/** Rotation that puts (lat, lon) at world direction `dir` with geographic north toward `north`. */
+export function orientation(lat: number, lon: number, dir: Vector3, north: Vector3): Matrix4 {
+  const t = latLonToLocal(lat, lon)
+  const nLocal = new Vector3(0, 1, 0).addScaledVector(t, -t.y).normalize()
+  const a = new Matrix4().makeBasis(t, nLocal, new Vector3().crossVectors(t, nLocal))
+  const nWorld = north.clone().addScaledVector(dir, -north.dot(dir)).normalize()
+  const b = new Matrix4().makeBasis(dir, nWorld, new Vector3().crossVectors(dir, nWorld))
+  return b.multiply(a.transpose())
+}
+
 /**
- * A stylized planet: cool slate continents, drifting cloud, a soft terminator,
- * ignition-orange city lights on the night side and a fresnel atmosphere.
+ * The planet. With NASA imagery loaded it's a photoreal Earth (day colour,
+ * drifting cloud with shadows, ocean glint, city lights, twilight scattering);
+ * otherwise a stylized planet baked from noise.
  */
 export class Planet {
   readonly group = new Group()
   private surface: ShaderMaterial
   private atmosphere: ShaderMaterial
+  private mesh: Mesh
+  private photoreal: boolean
 
-  constructor(renderer: WebGLRenderer, bakeWidth: number) {
+  constructor(renderer: WebGLRenderer, bakeWidth: number, textures: PlanetTextures | null = null) {
+    this.photoreal = textures !== null
+    this.surface = textures ? this.earthMaterial(textures) : this.bakedMaterial(renderer, bakeWidth)
+    this.mesh = new Mesh(new SphereGeometry(PLANET_RADIUS, 160, 96), this.surface)
+    if (textures) {
+      const pivot = new Group()
+      const dir = FOCAL_POINT.clone().sub(PLANET_CENTER).normalize()
+      pivot.quaternion.setFromRotationMatrix(orientation(FOCAL_LAT, FOCAL_LON, dir, new Vector3(0, 0, -1)))
+      pivot.add(this.mesh)
+      this.group.add(pivot)
+    } else {
+      // Tilt so temperate latitudes, not the polar cap, face the orbit path.
+      this.mesh.rotation.set(1.3, 0.2, -0.25)
+      this.group.add(this.mesh)
+    }
+
+    this.atmosphere = new ShaderMaterial({
+      uniforms: { uSunDir: { value: SUN_DIR.clone() }, uColor: { value: new Color('#86b6ff') }, uWarm: { value: new Color('#ff8a4a') } },
+      vertexShader: ATMO_VERT,
+      fragmentShader: ATMO_FRAG,
+      side: BackSide,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    })
+    this.group.add(new Mesh(new SphereGeometry(PLANET_RADIUS * (this.photoreal ? 1.028 : 1.045), 96, 48), this.atmosphere))
+    this.group.position.copy(PLANET_CENTER)
+  }
+
+  private earthMaterial(t: PlanetTextures): ShaderMaterial {
+    t.day.colorSpace = SRGBColorSpace
+    for (const tex of [t.day, t.night, t.clouds]) tex.anisotropy = 8
+    return new ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uDay: { value: t.day },
+        uNight: { value: t.night },
+        uClouds: { value: t.clouds },
+        uSunDir: { value: SUN_DIR.clone() },
+        uCity: { value: new Color('#ffad66') },
+        uAtmo: { value: new Color('#6fa6ff') },
+        uTwilight: { value: new Color('#ff7a3a') },
+      },
+      vertexShader: EARTH_VERT,
+      fragmentShader: EARTH_FRAG,
+    })
+  }
+
+  private bakedMaterial(renderer: WebGLRenderer, bakeWidth: number): ShaderMaterial {
     const surfaceMap = bakeEquirect(renderer, SURFACE_BAKE, bakeWidth, bakeWidth / 2)
     const cloudMap = bakeEquirect(renderer, CLOUD_BAKE, bakeWidth, bakeWidth / 2)
-    this.surface = new ShaderMaterial({
+    return new ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
         uSurface: { value: surfaceMap },
@@ -52,29 +139,77 @@ export class Planet {
       vertexShader: SURFACE_VERT,
       fragmentShader: SURFACE_FRAG,
     })
-    const planet = new Mesh(new SphereGeometry(PLANET_RADIUS, 128, 80), this.surface)
-    // Tilt so temperate latitudes, not the polar cap, face the orbit path.
-    planet.rotation.set(1.3, 0.2, -0.25)
-    this.group.add(planet)
-
-    this.atmosphere = new ShaderMaterial({
-      uniforms: { uSunDir: { value: SUN_DIR.clone() }, uColor: { value: new Color('#86b6ff') } },
-      vertexShader: ATMO_VERT,
-      fragmentShader: ATMO_FRAG,
-      side: BackSide,
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-    })
-    this.group.add(new Mesh(new SphereGeometry(PLANET_RADIUS * 1.045, 96, 48), this.atmosphere))
-    this.group.position.copy(PLANET_CENTER)
   }
 
   update(time: number) {
     this.surface.uniforms.uTime.value = time
-    this.group.children[0].rotation.y = 0.2 + time * 0.0025
+    // The Earth turns imperceptibly; its clouds drift a little faster in the shader.
+    if (this.photoreal) this.mesh.rotation.y = time * 0.0004
+    else this.mesh.rotation.y = 0.2 + time * 0.0025
   }
 }
+
+const EARTH_VERT = /* glsl */ `
+varying vec2 vUv;
+varying vec3 vNormalW;
+varying vec3 vWorld;
+void main() {
+  vUv = uv;
+  vec4 world = modelMatrix * vec4(position, 1.0);
+  vWorld = world.xyz;
+  vNormalW = normalize(mat3(modelMatrix) * normal);
+  gl_Position = projectionMatrix * viewMatrix * world;
+}
+`
+
+const EARTH_FRAG = /* glsl */ `
+uniform float uTime;
+uniform sampler2D uDay;
+uniform sampler2D uNight;
+uniform sampler2D uClouds;
+uniform vec3 uSunDir;
+uniform vec3 uCity;
+uniform vec3 uAtmo;
+uniform vec3 uTwilight;
+varying vec2 vUv;
+varying vec3 vNormalW;
+varying vec3 vWorld;
+void main() {
+  vec3 n = normalize(vNormalW);
+  vec3 v = normalize(cameraPosition - vWorld);
+  float ndl = dot(n, uSunDir);
+  float lit = smoothstep(-0.06, 0.2, ndl);
+
+  vec4 day = texture2D(uDay, vUv);
+  float water = smoothstep(0.55, 0.9, day.a);
+  vec2 cloudUv = vUv + vec2(uTime * 0.00025, 0.0);
+  float clouds = texture2D(uClouds, cloudUv).r;
+  // Cloud shadows fall slightly away from the sun on the surface below.
+  float shadow = texture2D(uClouds, cloudUv + vec2(0.0018, 0.0009)).r;
+
+  vec3 albedo = day.rgb * (1.0 - shadow * 0.45 * (1.0 - clouds));
+  albedo = mix(albedo, vec3(0.9, 0.92, 0.95), clouds * 0.92);
+  vec3 col = albedo * max(ndl, 0.0) * 1.7 * lit + albedo * 0.003;
+
+  // Sun glint on open water, softened by cloud.
+  vec3 h = normalize(uSunDir + v);
+  float glint = pow(max(dot(n, h), 0.0), 140.0) * water * (1.0 - clouds) * lit;
+  col += vec3(1.0, 0.9, 0.78) * glint * 3.0;
+
+  // City lights only where it's night and the sky is clear.
+  float night = 1.0 - smoothstep(-0.22, 0.04, ndl);
+  float lights = texture2D(uNight, vUv).r;
+  col += uCity * pow(lights, 2.0) * night * (1.0 - clouds * 0.9) * 2.6;
+
+  // Atmosphere seen through: blue on the lit limb; a thin warm band only where the
+  // terminator meets the limb (real twilight is a sliver, not a hemisphere-wide tint).
+  float fres = pow(1.0 - max(dot(n, v), 0.0), 3.5);
+  float twilight = smoothstep(-0.06, 0.0, ndl) * (1.0 - smoothstep(0.0, 0.06, ndl));
+  col += uAtmo * fres * (smoothstep(-0.2, 0.6, ndl) * 1.3 + 0.015);
+  col += uTwilight * twilight * fres * 0.12;
+  gl_FragColor = vec4(col, 1.0);
+}
+`
 
 const SURFACE_VERT = /* glsl */ `
 varying vec3 vLocal;
@@ -145,6 +280,7 @@ void main() {
 const ATMO_FRAG = /* glsl */ `
 uniform vec3 uSunDir;
 uniform vec3 uColor;
+uniform vec3 uWarm;
 varying vec3 vNormalW;
 varying vec3 vWorld;
 void main() {
@@ -152,8 +288,11 @@ void main() {
   vec3 v = normalize(cameraPosition - vWorld);
   float rim = 1.0 - abs(dot(n, v));
   float glow = pow(smoothstep(0.0, 1.0, rim), 7.0);
-  float lit = smoothstep(-0.45, 0.5, dot(n, uSunDir)) + 0.04;
-  vec3 col = uColor * glow * lit * 2.2;
+  float sun = dot(n, uSunDir);
+  float lit = smoothstep(-0.45, 0.5, sun) + 0.04;
+  // Sunset band: the limb turns warm right where day meets night.
+  float band = smoothstep(-0.25, -0.02, sun) * (1.0 - smoothstep(-0.02, 0.2, sun));
+  vec3 col = mix(uColor, uWarm, band * 0.85) * glow * lit * 2.2;
   gl_FragColor = vec4(col, glow * lit);
 }
 `

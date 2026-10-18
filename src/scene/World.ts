@@ -32,6 +32,7 @@ import { NamePlate } from './NamePlate'
 import { ParticleField } from './ParticleField'
 import { Payloads } from './Payloads'
 import { Planet } from './Planet'
+import { planetTextures } from './planetTextures'
 import { Rocket } from './Rocket'
 import { Sky, SUN_DIR } from './Sky'
 import { createNoiseTexture } from './bake'
@@ -96,6 +97,7 @@ export class World {
     quality: Quality,
     projects: readonly Project[],
     name: { first: string; last: string },
+    assets: Map<string, unknown> = new Map(),
   ) {
     const { budget } = quality
     const bakeWidth = budget.tier === 'low' ? 1024 : 2048
@@ -134,7 +136,7 @@ export class World {
     this.pad.add(hemi, moon)
 
     // Orbit world.
-    this.planet = new Planet(renderer, bakeWidth)
+    this.planet = new Planet(renderer, bakeWidth, planetTextures(assets))
     this.payloads = new Payloads(projects, budget)
     this.field = new ParticleField(budget.contact, fieldPosition(projects.length))
     this.field.setReducedMotion(quality.reducedMotion)

@@ -1,4 +1,71 @@
 {
   "version": 1,
-  "assets": []
+  "assets": [
+    {
+      "id": "earth-day",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/earth-day-high.webp",
+          "bytes": 531982,
+          "width": 4096
+        },
+        "medium": {
+          "url": "assets/earth-day-medium.webp",
+          "bytes": 169238,
+          "width": 2048
+        },
+        "low": {
+          "url": "assets/earth-day-low.webp",
+          "bytes": 52016,
+          "width": 1024
+        }
+      }
+    },
+    {
+      "id": "earth-night",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/earth-night-high.webp",
+          "bytes": 160322,
+          "width": 4096
+        },
+        "medium": {
+          "url": "assets/earth-night-medium.webp",
+          "bytes": 43216,
+          "width": 2048
+        },
+        "low": {
+          "url": "assets/earth-night-low.webp",
+          "bytes": 11738,
+          "width": 1024
+        }
+      }
+    },
+    {
+      "id": "earth-clouds",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/earth-clouds-high.webp",
+          "bytes": 1583424,
+          "width": 4096
+        },
+        "medium": {
+          "url": "assets/earth-clouds-medium.webp",
+          "bytes": 447620,
+          "width": 2048
+        },
+        "low": {
+          "url": "assets/earth-clouds-low.webp",
+          "bytes": 124728,
+          "width": 1024
+        }
+      }
+    }
+  ]
 }
