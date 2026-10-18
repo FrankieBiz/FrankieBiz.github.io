@@ -260,9 +260,15 @@ async function boot() {
     for (const patch of warmups) {
       Object.assign(state, patch)
       world.update(1 / 60, 0, state, pointer)
+      // Optional passes sleep while unused and would otherwise compile on first use mid-scroll
+      // (depth of field: 80–180 ms on a cold cache, light shafts 30–70 ms).
+      post.setFocus(world.rig.focusPoint, 1)
+      post.setShafts(true, 1)
       post.render(1 / 60, 0)
       await nextFrame()
     }
+    post.setFocus(world.rig.focusPoint, 0)
+    post.setShafts(false, 0)
     world.setAllVisible(false)
     // Restore every value the warm-up touched: tracks that start later in the
     // timeline don't write until the scroll reaches them.
