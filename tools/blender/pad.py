@@ -159,7 +159,7 @@ def build_mount():
         steel.append(beam("Pipe", (tx, ty + 0.15 * k, r), (-1.45, 0.9 + 0.15 * k, r), (r * 2, r * 2)))
 
     mat_concrete = common.material("Concrete", (0.09, 0.095, 0.105), roughness=0.88)
-    mat_steel = common.material("Steel", (0.05, 0.055, 0.065), roughness=0.55, metallic=0.65)
+    mat_steel = common.material("Steel", (0.05, 0.055, 0.065), roughness=0.8, metallic=0.45)
     for obj in concrete:
         common.assign(obj, mat_concrete)
     for obj in steel:
@@ -317,7 +317,7 @@ def main():
     common.reset()
     out = common.ensure_dir(opts.out)
 
-    mat_steel = common.material("Steel", (0.05, 0.055, 0.065), roughness=0.55, metallic=0.65)
+    mat_steel = common.material("Steel", (0.05, 0.055, 0.065), roughness=0.8, metallic=0.45)
     mat_hose = common.material("Hose", (0.04, 0.045, 0.055), roughness=0.6)
     mat_lens = common.material("Lens", (1, 1, 1), roughness=0.2, emission=(1, 1, 1), strength=8)
 

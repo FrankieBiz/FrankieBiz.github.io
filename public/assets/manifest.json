@@ -175,7 +175,7 @@
       "tiers": {
         "high": {
           "url": "assets/pad-ao-high.webp",
-          "bytes": 716190,
+          "bytes": 716246,
           "width": 2048
         },
         "medium": {
@@ -219,15 +219,15 @@
       "tiers": {
         "high": {
           "url": "assets/env-pad-high.hdr",
-          "bytes": 681391
+          "bytes": 679261
         },
         "medium": {
           "url": "assets/env-pad-medium.hdr",
-          "bytes": 202702
+          "bytes": 202388
         },
         "low": {
           "url": "assets/env-pad-low.hdr",
-          "bytes": 202702
+          "bytes": 202388
         }
       }
     },
