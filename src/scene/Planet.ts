@@ -203,7 +203,7 @@ void main() {
 
   // Atmosphere seen through: blue on the lit limb; a thin warm band only where the
   // terminator meets the limb (real twilight is a sliver, not a hemisphere-wide tint).
-  float fres = pow(1.0 - max(dot(n, v), 0.0), 3.5);
+  float fres = pow(clamp(1.0 - dot(n, v), 0.0, 1.0), 3.5);
   float twilight = smoothstep(-0.06, 0.0, ndl) * (1.0 - smoothstep(0.0, 0.06, ndl));
   col += uAtmo * fres * (smoothstep(-0.2, 0.6, ndl) * 1.3 + 0.015);
   col += uTwilight * twilight * fres * 0.12;
@@ -260,7 +260,7 @@ void main() {
   float night = 1.0 - smoothstep(-0.2, 0.05, ndl);
   col += uCity * s.a * night * (1.0 - clouds * 0.8) * 2.4;
 
-  float fres = pow(1.0 - max(dot(n, v), 0.0), 3.0);
+  float fres = pow(clamp(1.0 - dot(n, v), 0.0, 1.0), 3.0);
   col += uAtmo * fres * (smoothstep(-0.3, 0.4, ndl) * 1.1 + 0.05);
   gl_FragColor = vec4(col, 1.0);
 }

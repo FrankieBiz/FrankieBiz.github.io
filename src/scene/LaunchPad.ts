@@ -424,7 +424,8 @@ void main() {
   vec3 view = normalize(cameraPosition - vWorld);
   float facing = abs(dot(normalize(vNormalW), view));
   float soft = pow(facing, 2.2);
-  float falloff = pow(1.0 - vAlong, 1.7) * smoothstep(0.0, 0.06, vAlong);
+  // Interpolation can carry vAlong a hair past 1.0; pow() of a negative base is NaN on some GPUs.
+  float falloff = pow(max(1.0 - vAlong, 0.0), 1.7) * smoothstep(0.0, 0.06, vAlong);
   float n = texture2D(uNoise, vWorld.xy * 0.06 + vec2(uTime * 0.01, -uTime * 0.012)).r;
   n *= texture2D(uNoise, vWorld.zy * 0.05 + vec2(-uTime * 0.008, uTime * 0.01)).g * 2.0;
   float dust = 0.55 + 0.45 * n;

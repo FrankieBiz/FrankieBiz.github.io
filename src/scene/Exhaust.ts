@@ -266,7 +266,7 @@ void main() {
   vec3 down = normalize(vec3((aSeed.z - 0.5) * 0.9, 0.0, -1.0));
   vec3 dir = normalize(mix(radial, down, trench));
   float reach = mix(4.0, 19.0, aSeed.w) * mix(0.55, 1.0, trench);
-  float travel = 1.0 - pow(1.0 - age, 2.4);
+  float travel = 1.0 - pow(max(1.0 - age, 0.0), 2.4);
   vec3 p = vec3(0.0, 0.5, -0.6) + dir * reach * travel;
   p.y += pow(age, 1.25) * mix(1.5, 10.0, extra);
   p += swirl3(p * 0.22 + aSeed.xyz * 10.0 + uTime * 0.08) * 1.4 * age;

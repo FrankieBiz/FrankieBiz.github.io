@@ -155,7 +155,7 @@ varying float vHeat;
 varying float vAlpha;
 ${NOISE}
 float easeInOutCubic(float t) {
-  return t < 0.5 ? 4.0 * t * t * t : 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0;
+  return t < 0.5 ? 4.0 * t * t * t : 1.0 - pow(max(2.0 - 2.0 * t, 0.0), 3.0) / 2.0;
 }
 void main() {
   float local = clamp((uMorph - aRand.x * ${DELAY.toFixed(2)}) / ${(1 - DELAY).toFixed(2)}, 0.0, 1.0);
