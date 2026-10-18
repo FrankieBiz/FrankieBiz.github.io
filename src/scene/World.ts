@@ -68,6 +68,15 @@ function bakeEnvironment(renderer: WebGLRenderer, top: Color, bottom: Color, pan
   return tex
 }
 
+/** Prefilters an equirect HDR (rendered in Blender) into a PMREM environment map. */
+function environmentFromEquirect(renderer: WebGLRenderer, equirect: Texture): Texture {
+  const pmrem = new PMREMGenerator(renderer)
+  const tex = pmrem.fromEquirectangular(equirect).texture
+  pmrem.dispose()
+  equirect.dispose()
+  return tex
+}
+
 export class World {
   readonly scene = new Scene()
   readonly rig: CameraRig
@@ -111,15 +120,16 @@ export class World {
     this.scene.add(this.pad, this.orbit)
     this.scene.fog = this.fog
 
-    // Environments.
-    this.envPad = bakeEnvironment(renderer, new Color('#1a2638'), new Color('#05070b'), [
-      [new Vector3(12.5, 9, 9.5), new Color(5, 5.3, 6), 6],
-      [new Vector3(-9.5, 9, -12.5), new Color(3.4, 3.8, 4.6), 6],
-      [new Vector3(-13, 9, 7.5), new Color(2.2, 2.4, 2.8), 5],
-    ])
-    this.envOrbit = bakeEnvironment(renderer, new Color('#020305'), new Color('#1e3654'), [
-      [SUN_DIR.clone(), new Color(40, 38, 34), 4],
-    ])
+    // Pad environment: rendered from inside the launch site (tools/blender/environment.py),
+    // or a gradient with the floodlamps as panels. The orbit one is captured once the planet exists.
+    const padEnv = assets.get('env-pad') as Texture | undefined
+    this.envPad = padEnv
+      ? environmentFromEquirect(renderer, padEnv)
+      : bakeEnvironment(renderer, new Color('#1a2638'), new Color('#05070b'), [
+          [new Vector3(12.5, 9, 9.5), new Color(5, 5.3, 6), 6],
+          [new Vector3(-9.5, 9, -12.5), new Color(3.4, 3.8, 4.6), 6],
+          [new Vector3(-13, 9, 7.5), new Color(2.2, 2.4, 2.8), 5],
+        ])
     this.scene.environment = this.envPad
 
     // Shared rocket.
@@ -161,6 +171,26 @@ export class World {
 
     this.sky = new Sky(renderer, budget.stars, bakeWidth)
     this.scene.add(this.sky.group)
+    this.envOrbit = this.captureOrbitEnvironment()
+  }
+
+  /**
+   * Renders the orbit world itself (planet, atmosphere, sky and sun) around the
+   * coasting rocket into a PMREM, so reflections match what's on screen.
+   */
+  private captureOrbitEnvironment(): Texture {
+    const hidden = [this.pad, this.rocket.group, this.payloads.group, this.field.group, this.sky.starfield]
+    const visible = hidden.map((o) => o.visible)
+    for (const o of hidden) o.visible = false
+    this.orbit.visible = true
+    const at = new Vector3(...ORBIT_ROCKET)
+    this.sky.update(0, at, 1, true)
+    const pmrem = new PMREMGenerator(this.renderer)
+    const tex = pmrem.fromScene(this.scene, 0, 0.5, 1000, { size: 256, position: at }).texture
+    pmrem.dispose()
+    hidden.forEach((o, i) => (o.visible = visible[i]))
+    this.orbit.visible = false
+    return tex
   }
 
   resize(width: number, height: number, dpr: number) {

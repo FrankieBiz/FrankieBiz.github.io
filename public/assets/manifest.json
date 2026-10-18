@@ -211,6 +211,25 @@
           "width": 512
         }
       }
+    },
+    {
+      "id": "env-pad",
+      "kind": "hdr",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/env-pad-high.hdr",
+          "bytes": 682041
+        },
+        "medium": {
+          "url": "assets/env-pad-medium.hdr",
+          "bytes": 202807
+        },
+        "low": {
+          "url": "assets/env-pad-low.hdr",
+          "bytes": 202807
+        }
+      }
     }
   ]
 }

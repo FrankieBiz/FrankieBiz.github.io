@@ -50,6 +50,8 @@ export const ASSETS = [
   },
   { id: 'pad-ao', kind: 'texture', src: 'blender/pad-ao.png', width: { high: 2048, medium: 1024, low: 1024 }, quality: 86 },
   { id: 'ground-ao', kind: 'texture', src: 'blender/ground-ao.png', width: { high: 1024, medium: 1024, low: 512 }, quality: 86 },
+  // Pad environment rendered from inside the launch site (tools/blender/environment.py).
+  { id: 'env-pad', kind: 'hdr', src: 'blender/env-pad-{tier}.hdr' },
 ]
 
 /** Per-pixel transforms over RGBA buffers (rules live in src/assets/earthMaps.ts). */

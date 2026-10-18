@@ -38,6 +38,8 @@ const SPACE_HORIZON = new Color('#020305')
  */
 export class Sky {
   readonly group = new Group()
+  /** Hidden while capturing environment maps: point sprites sized for the screen read as blotches there. */
+  readonly starfield: Points
   private dome: ShaderMaterial
   private stars: ShaderMaterial
 
@@ -91,10 +93,10 @@ export class Sky {
       blending: AdditiveBlending,
       fog: false,
     })
-    const stars = new Points(geo, this.stars)
-    stars.renderOrder = -9
-    stars.frustumCulled = false
-    this.group.add(stars)
+    this.starfield = new Points(geo, this.stars)
+    this.starfield.renderOrder = -9
+    this.starfield.frustumCulled = false
+    this.group.add(this.starfield)
   }
 
   setPixelRatio(dpr: number) {
