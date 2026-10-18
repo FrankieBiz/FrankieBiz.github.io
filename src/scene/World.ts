@@ -147,7 +147,7 @@ export class World {
     const contactShadows = structures ? ((assets.get('ground-ao') as Texture | undefined) ?? null) : null
     this.launchPad = new LaunchPad(createPadTexture(contactShadows), noise, budget.shadows, structures)
     this.pad.add(this.launchPad.group)
-    this.exhaust = new Exhaust(budget, createPuffTexture())
+    this.exhaust = new Exhaust(budget, createPuffTexture(), (assets.get('smoke-atlas') as Texture | undefined) ?? null)
     this.rocket.nozzle.add(this.exhaust.flame)
     this.pad.add(this.exhaust.world)
     this.name = new NamePlate(name.first, name.last)

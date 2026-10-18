@@ -19,6 +19,7 @@ import {
 import type { QualityBudget } from '../core/Quality'
 import type { DirectorState } from '../director/state'
 import { NOISE } from './shaders/noise'
+import { FLIPBOOK_GLSL } from './SmokeFlipbook'
 import { mulberry32 } from './textures'
 
 const IGNITE = new Color('#ff6a1a')
@@ -37,7 +38,8 @@ function seeds(count: number, seed: number) {
 /**
  * Engine exhaust. Particles are stateless: every position is a pure function
  * of time and a per-particle seed, so scrubbing the scroll never desyncs them
- * and the CPU never touches a vertex.
+ * and the CPU never touches a vertex. Smoke draws from the simulated flipbook
+ * (src/scene/SmokeFlipbook.ts) when it loaded, else a painted puff.
  */
 export class Exhaust {
   /** Attach to the rocket's nozzle anchor. */
@@ -54,7 +56,7 @@ export class Exhaust {
   private trailPoints: Points
   private smokePoints: Points
 
-  constructor(budget: QualityBudget, puff: Texture) {
+  constructor(budget: QualityBudget, puff: Texture, flipbook: Texture | null = null) {
     const flameMat = (core: boolean) =>
       new ShaderMaterial({
         uniforms: {
@@ -100,16 +102,20 @@ export class Exhaust {
       uAmount: { value: 0 },
       uIgnition: { value: 0 },
       uScale: { value: 800 },
-      uMap: { value: puff },
+      uMap: { value: flipbook ?? puff },
       uDark: { value: new Color('#1c232d') },
       uLit: { value: new Color('#7a8696') },
       uGlow: { value: IGNITE.clone() },
     }
 
+    // The flipbook bakes light from above and below, so its sprites only sway and mirror instead of spinning freely.
+    const defines = flipbook ? { FLIPBOOK: '' } : {}
+    const fragmentShader = flipbook ? FLIPBOOK_FRAG : PUFF_FRAG
     this.smoke = new ShaderMaterial({
       uniforms: { ...common },
+      defines,
       vertexShader: SMOKE_VERT,
-      fragmentShader: PUFF_FRAG,
+      fragmentShader,
       transparent: true,
       depthWrite: false,
       blending: NormalBlending,
@@ -126,8 +132,9 @@ export class Exhaust {
         uNozzle: { value: new Vector3() },
         uTrailLen: { value: 0 },
       },
+      defines,
       vertexShader: TRAIL_VERT,
-      fragmentShader: PUFF_FRAG,
+      fragmentShader,
       transparent: true,
       depthWrite: false,
       blending: NormalBlending,
@@ -245,6 +252,7 @@ uniform float uScale;
 varying float vAlpha;
 varying float vAge;
 varying float vRot;
+varying float vSeed;
 varying vec3 vWorld;
 ${NOISE}
 void main() {
@@ -269,7 +277,12 @@ void main() {
   float alive = step(extra, uAmount);
   vAlpha = smoothstep(0.0, 0.07, age) * (1.0 - smoothstep(0.5, 1.0, age)) * alive;
   vAge = age;
+#ifdef FLIPBOOK
+  vRot = (aSeed.z - 0.5) * 0.7 + age * (aSeed.y - 0.5) * 0.5;
+#else
   vRot = aSeed.z * 6.28 + uTime * (aSeed.y - 0.5) * 0.35;
+#endif
+  vSeed = aSeed.y;
   vWorld = p;
 }
 `
@@ -284,6 +297,7 @@ uniform float uTrailLen;
 varying float vAlpha;
 varying float vAge;
 varying float vRot;
+varying float vSeed;
 varying vec3 vWorld;
 ${NOISE}
 void main() {
@@ -303,7 +317,12 @@ void main() {
   gl_Position = projectionMatrix * mv;
   vAlpha = smoothstep(0.0, 0.02, age) * (1.0 - smoothstep(0.4, 1.0, age)) * uAmount;
   vAge = age;
+#ifdef FLIPBOOK
+  vRot = (aSeed.z - 0.5) * 0.7 + age * (aSeed.w - 0.5) * 0.5;
+#else
   vRot = aSeed.z * 6.28 + uTime * (aSeed.w - 0.5) * 0.4;
+#endif
+  vSeed = aSeed.y;
   vWorld = p;
 }
 `
@@ -333,5 +352,43 @@ void main() {
   float tone = fract(vRot * 7.31);
   vec3 col = mix(uDark, uLit, 0.12 + height * 0.4 + tone * 0.22) + uGlow * glow * 1.35;
   gl_FragColor = vec4(col * a, a);
+}
+`
+
+const FLIPBOOK_FRAG = /* glsl */ `
+uniform sampler2D uMap;
+uniform float uIgnition;
+uniform vec3 uDark;
+uniform vec3 uLit;
+uniform vec3 uGlow;
+varying float vAlpha;
+varying float vAge;
+varying float vRot;
+varying float vSeed;
+varying vec3 vWorld;
+${FLIPBOOK_GLSL}
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  // The baked frames fade out inside this circle, so rotation never reaches a neighbouring cell.
+  if (dot(c, c) > 0.25) discard;
+  float s = sin(vRot);
+  float co = cos(vRot);
+  vec2 r = vec2(co * c.x - s * c.y, s * c.x + co * c.y);
+  // Mirror half the puffs: keeps light from above above. Offset each puff's frame for variety.
+  r.x *= vSeed > 0.5 ? -1.0 : 1.0;
+  float age = clamp(vAge * 0.82 + fract(vSeed * 13.7) * 0.18, 0.0, 1.0);
+  vec4 smoke = sampleFlipbook(uMap, age, r + 0.5);
+  // Light only where there is smoke (guards against encoder noise under zero alpha).
+  smoke.rgb *= smoothstep(0.0, 0.03, smoke.a);
+  float a = smoke.a * vAlpha * 0.55;
+  if (a < 0.002) discard;
+  float near = exp(-length(vWorld - vec3(0.0, 1.0, -0.4)) * 0.42);
+  float young = 1.0 - smoothstep(0.0, 0.12, vAge);
+  float glow = uIgnition * (near * 1.1 + young * 0.6);
+  float height = clamp(vWorld.y / 12.0, 0.0, 1.0);
+  vec3 col = uDark * smoke.a * 1.4
+    + uLit * (smoke.r * (0.55 + height * 0.6) + smoke.b * 0.3)
+    + uGlow * smoke.g * glow * 2.4;
+  gl_FragColor = vec4(col * vAlpha * 0.55, a);
 }
 `

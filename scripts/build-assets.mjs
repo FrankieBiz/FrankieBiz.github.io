@@ -52,6 +52,16 @@ export const ASSETS = [
   { id: 'ground-ao', kind: 'texture', src: 'blender/ground-ao.png', width: { high: 1024, medium: 1024, low: 512 }, quality: 86 },
   // Pad environment rendered from inside the launch site (tools/blender/environment.py).
   { id: 'env-pad', kind: 'hdr', src: 'blender/env-pad-{tier}.hdr' },
+  // Simulated smoke flipbook (tools/blender/smoke.py). RGB is light that the shader uses
+  // directly, so keep it exact under transparent texels instead of letting WebP rewrite it.
+  {
+    id: 'smoke-atlas',
+    kind: 'texture',
+    src: 'blender/smoke-atlas.png',
+    width: { high: 2048, medium: 2048, low: 1024 },
+    quality: 88,
+    webp: { exact: true, smartSubsample: true },
+  },
 ]
 
 /** Per-pixel transforms over RGBA buffers (rules live in src/assets/earthMaps.ts). */
@@ -87,7 +97,7 @@ async function buildTexture(asset, tier) {
     image = sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
     if (asset.transform !== 'earth-day') image = image.removeAlpha()
   }
-  await image.webp({ quality: asset.quality ?? 82, alphaQuality: 90, effort: 6 }).toFile(out)
+  await image.webp({ quality: asset.quality ?? 82, alphaQuality: 90, effort: 6, ...asset.webp }).toFile(out)
   const meta = await sharp(out).metadata()
   return { url: `assets/${basename(out)}`, bytes: statSync(out).size, width: Math.max(meta.width ?? 0, meta.height ?? 0) }
 }

@@ -230,6 +230,28 @@
           "bytes": 202807
         }
       }
+    },
+    {
+      "id": "smoke-atlas",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/smoke-atlas-high.webp",
+          "bytes": 1446148,
+          "width": 2048
+        },
+        "medium": {
+          "url": "assets/smoke-atlas-medium.webp",
+          "bytes": 1446148,
+          "width": 2048
+        },
+        "low": {
+          "url": "assets/smoke-atlas-low.webp",
+          "bytes": 461440,
+          "width": 1024
+        }
+      }
     }
   ]
 }
