@@ -5,6 +5,7 @@ import {
   Group,
   Matrix4,
   Mesh,
+  RepeatWrapping,
   ShaderMaterial,
   SphereGeometry,
   SRGBColorSpace,
@@ -105,6 +106,8 @@ export class Planet {
   private earthMaterial(t: PlanetTextures): ShaderMaterial {
     t.day.colorSpace = SRGBColorSpace
     for (const tex of [t.day, t.night, t.clouds]) tex.anisotropy = 8
+    // Clouds drift in u forever; clamped, they'd smear from the antimeridian after ~30 minutes.
+    t.clouds.wrapS = RepeatWrapping
     return new ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
