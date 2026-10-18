@@ -241,6 +241,43 @@ check('no console errors during the session', problems.length === 0, [...new Set
   await ctx.close()
 }
 
+// ------------------------------------------- slow network → loader completes
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const p = await ctx.newPage()
+  const errors = []
+  p.on('pageerror', (e) => errors.push(e.message))
+  p.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+  const cdp = await ctx.newCDPSession(p)
+  await cdp.send('Network.enable')
+  // ~3 Mbit/s: the medium tier's assets take several seconds to stream.
+  await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: 400 * 1024, uploadThroughput: 200 * 1024 })
+  await p.goto(`${base}?quality=medium`, { waitUntil: 'domcontentloaded' })
+  // The counter should creep through the asset band (10–50%) as bytes arrive, not jump.
+  const seen = new Set()
+  const started = Date.now()
+  let booted = false
+  while (Date.now() - started < 180000) {
+    const state = await p.evaluate(() => ({
+      ready: document.documentElement.classList.contains('is-ready'),
+      count: Number(document.querySelector('.loader__count')?.textContent ?? 'NaN'),
+    }))
+    if (state.count > 10 && state.count < 50) seen.add(state.count)
+    if (state.ready) {
+      booted = true
+      break
+    }
+    await p.waitForTimeout(150)
+  }
+  const assets = await p.evaluate(() => performance.getEntriesByType('resource').filter((r) => new URL(r.name).pathname.startsWith('/assets/')).length)
+  check(
+    'slow network → loader shows byte progress and completes',
+    booted && seen.size >= 3 && assets > 0 && errors.length === 0,
+    `booted=${booted} progress steps in asset band=${seen.size} asset requests=${assets} ${errors.join(' || ')}`,
+  )
+  await ctx.close()
+}
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
 await browser.close()
