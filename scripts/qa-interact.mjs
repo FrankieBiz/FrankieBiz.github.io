@@ -252,7 +252,9 @@ check('no console errors during the session', problems.length === 0, [...new Set
   await cdp.send('Network.enable')
   // ~3 Mbit/s: the medium tier's assets take several seconds to stream.
   await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: 400 * 1024, uploadThroughput: 200 * 1024 })
-  await p.goto(`${base}?quality=medium`, { waitUntil: 'domcontentloaded' })
+  // The dev server ships modules unbundled, so DOMContentLoaded alone can take tens of seconds
+  // at this rate; the readiness loop below has its own budget.
+  await p.goto(`${base}?quality=medium`, { waitUntil: 'commit', timeout: 120000 })
   // The counter should creep through the asset band (10–50%) as bytes arrive, not jump.
   const seen = new Set()
   const started = Date.now()

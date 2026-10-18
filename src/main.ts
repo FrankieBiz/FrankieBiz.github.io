@@ -282,7 +282,7 @@ async function boot() {
   const heatB = new Vector2()
   const intro = { amount: reduced ? 0 : 1 }
   const debug = new URLSearchParams(location.search).has('debug') ? createDebugOverlay() : null
-  if (debug) Object.assign(window, { __mission: { scroll, state, timeline, layout, world } })
+  if (debug) Object.assign(window, { __mission: { scroll, state, timeline, layout, world, post, renderer } })
 
   loop.add((dt, t) => {
     scroll.update(dt)
