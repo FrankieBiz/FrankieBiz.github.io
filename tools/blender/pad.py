@@ -147,7 +147,13 @@ def build_mount():
         steel.append(rib)
     # Trench curbs and service pipes from the tower.
     for x in (-1.62, 1.62):
-        concrete.append(common.box("Curb", (0.2, 13.9, 0.18), (x, 1.6 + 13.9 / 2, 0.09)))
+        curb = common.box("Curb", (0.2, 14.2, 0.18), (x, 1.3 + 14.2 / 2, 0.09))
+        # Ramp the end by the mount into the ground: a vertical end face there faces
+        # the engine light head-on and reads as a flat glowing block.
+        for v in curb.data.vertices:
+            if v.co.y < 0 and v.co.z > 0:
+                v.co.y += 0.6
+        concrete.append(curb)
     tx, ty = TOWER["x"] + TOWER["w"] / 2, -TOWER["z"] - TOWER["w"] / 2
     for k, r in enumerate((0.06, 0.045, 0.035)):
         steel.append(beam("Pipe", (tx, ty + 0.15 * k, r), (-1.45, 0.9 + 0.15 * k, r), (r * 2, r * 2)))

@@ -156,15 +156,15 @@
       "tiers": {
         "high": {
           "url": "assets/pad-high.glb",
-          "bytes": 295060
+          "bytes": 295632
         },
         "medium": {
           "url": "assets/pad-medium.glb",
-          "bytes": 295060
+          "bytes": 295632
         },
         "low": {
           "url": "assets/pad-low.glb",
-          "bytes": 295060
+          "bytes": 295632
         }
       }
     },
@@ -175,17 +175,17 @@
       "tiers": {
         "high": {
           "url": "assets/pad-ao-high.webp",
-          "bytes": 715772,
+          "bytes": 716190,
           "width": 2048
         },
         "medium": {
           "url": "assets/pad-ao-medium.webp",
-          "bytes": 195256,
+          "bytes": 195246,
           "width": 1024
         },
         "low": {
           "url": "assets/pad-ao-low.webp",
-          "bytes": 195256,
+          "bytes": 195246,
           "width": 1024
         }
       }
@@ -197,17 +197,17 @@
       "tiers": {
         "high": {
           "url": "assets/ground-ao-high.webp",
-          "bytes": 8970,
+          "bytes": 8846,
           "width": 1024
         },
         "medium": {
           "url": "assets/ground-ao-medium.webp",
-          "bytes": 8970,
+          "bytes": 8846,
           "width": 1024
         },
         "low": {
           "url": "assets/ground-ao-low.webp",
-          "bytes": 2038,
+          "bytes": 2044,
           "width": 512
         }
       }
@@ -219,15 +219,15 @@
       "tiers": {
         "high": {
           "url": "assets/env-pad-high.hdr",
-          "bytes": 682041
+          "bytes": 682047
         },
         "medium": {
           "url": "assets/env-pad-medium.hdr",
-          "bytes": 202807
+          "bytes": 202831
         },
         "low": {
           "url": "assets/env-pad-low.hdr",
-          "bytes": 202807
+          "bytes": 202831
         }
       }
     },
