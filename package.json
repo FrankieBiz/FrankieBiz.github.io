@@ -13,7 +13,8 @@
     "qa": "node scripts/qa-shots.mjs",
     "assets": "node scripts/build-assets.mjs",
     "assets:fetch": "node scripts/fetch-nasa.mjs",
-    "assets:grade": "uv run --quiet tools/lut/make_lut.py && uv run --quiet tools/textures/lens_dirt.py"
+    "assets:grade": "uv run --quiet tools/lut/make_lut.py && uv run --quiet tools/textures/lens_dirt.py",
+    "assets:blender": "node scripts/blender.mjs"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
