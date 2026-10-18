@@ -14,7 +14,8 @@ const FLOODS: Array<[number, number]> = [
 const FLOOD_HEAD_Y = 9.1
 
 function load(tier: string) {
-  const buffer = readFileSync(`assets-src/blender/env-pad-${tier}.hdr`)
+  // The shipped copies (byte-identical to the gitignored assets-src/blender renders).
+  const buffer = readFileSync(`public/assets/env-pad-${tier}.hdr`)
   const loader = new HDRLoader().setDataType(FloatType)
   const parsed = loader.parse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
   const width = parsed.width ?? 0

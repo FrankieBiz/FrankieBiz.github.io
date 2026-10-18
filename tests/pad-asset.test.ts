@@ -7,9 +7,13 @@ const FILE = 'assets-src/blender/pad.glb'
 const TOWER = { x: -3.0, z: -2.1, half: 0.75 }
 const ARM_LEVELS = [3.1, 6.5, 8.95]
 
+// Blender's raw export lives in gitignored assets-src/: these checks run where the assets are
+// built and skip in CI; the built-asset checks below run everywhere.
+const HAS_SOURCE = existsSync(FILE)
+
 let doc: Document
 beforeAll(async () => {
-  doc = await new NodeIO().read(FILE)
+  if (HAS_SOURCE) doc = await new NodeIO().read(FILE)
 })
 
 const node = (name: string) => doc.getRoot().listNodes().find((n) => n.getName() === name)
@@ -20,7 +24,7 @@ function localX(n: Node): [number, number, number] {
   return [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w)]
 }
 
-describe('authored launch pad asset', () => {
+describe.skipIf(!HAS_SOURCE)('authored launch pad asset', () => {
   it('has the parts the site drives by name', () => {
     const names = doc.getRoot().listNodes().map((n) => n.getName())
     for (const name of ['Tower', 'Mount', 'Arm_0', 'Arm_1', 'Arm_2', 'Beacon']) expect(names, name).toContain(name)

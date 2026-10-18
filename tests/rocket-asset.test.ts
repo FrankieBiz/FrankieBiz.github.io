@@ -1,4 +1,5 @@
 import { NodeIO, type Document } from '@gltf-transform/core'
+import { existsSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 const FILE = 'assets-src/blender/rocket.glb'
@@ -7,14 +8,18 @@ const HULL_Y0 = 0.3
 const HULL_Y1 = 10
 const NOZZLE_EXIT_Y = -0.5
 
+// Blender's raw export lives in gitignored assets-src/: these checks run where the assets are
+// built and skip in CI; the built-asset checks below run everywhere.
+const HAS_SOURCE = existsSync(FILE)
+
 let doc: Document
 beforeAll(async () => {
-  doc = await new NodeIO().read(FILE)
+  if (HAS_SOURCE) doc = await new NodeIO().read(FILE)
 })
 
 const meshNodes = () => doc.getRoot().listNodes().filter((n) => n.getMesh())
 
-describe('authored rocket asset', () => {
+describe.skipIf(!HAS_SOURCE)('authored rocket asset', () => {
   it('has the parts the site drives by name', () => {
     const names = doc.getRoot().listNodes().map((n) => n.getName())
     for (const name of ['Hull', 'Fin_0', 'Fin_1', 'Fin_2', 'Fin_3', 'Nozzle', 'NozzleExit', 'Raceway']) {

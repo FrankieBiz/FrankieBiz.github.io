@@ -3,7 +3,8 @@ import { LUTCubeLoader } from 'three/addons/loaders/LUTCubeLoader.js'
 import { describe, expect, it } from 'vitest'
 import type { AssetManifest } from '../src/assets/manifest'
 
-const CUBE = 'assets-src/grade/grade.cube'
+// The shipped copy (byte-identical to assets-src/grade/grade.cube, which is gitignored).
+const CUBE = 'public/assets/grade.cube'
 
 describe('colour grade LUT', () => {
   const text = readFileSync(CUBE, 'utf8')
