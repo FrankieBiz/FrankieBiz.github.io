@@ -105,8 +105,9 @@ AXE_PATH=/path/to/axe-core/axe.min.js node scripts/qa-interact.mjs   # with axe
 The build uses a relative base, so it works at `username.github.io` or at a
 project sub-path.
 
-After the first deploy, change `og:image` in `index.html` to the absolute URL
-(e.g. `https://<user>.github.io/og.jpg`) — social crawlers ignore relative paths.
+Live at **https://frankiebiz.github.io/**. Social crawlers ignore relative paths, so
+`og:image`, `og:url` and the canonical link in `index.html` use that absolute URL;
+update them if the site moves.
 
 ## Social preview image
 
