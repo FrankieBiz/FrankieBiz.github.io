@@ -42,7 +42,24 @@ function calls(src: string, fn: string): string[][] {
   return out
 }
 
-const GUARDED = /^(max|clamp|abs|exp|saturate)\s*\(/
+/** True when the whole expression is one call to a function that can't return a negative. */
+function wholeGuardCall(expr: string): boolean {
+  const m = /^(max|clamp|abs|exp|saturate)\(/.exec(expr)
+  if (!m) return false
+  let depth = 0
+  for (let i = m[0].length - 1; i < expr.length; i++) {
+    if (expr[i] === '(') depth++
+    else if (expr[i] === ')' && --depth === 0) return i === expr.length - 1
+  }
+  return false
+}
+
+/** Could this pow() base go negative? Any subtraction or negation that isn't wrapped whole in a guard. */
+function riskyBase(base: string): boolean {
+  const expr = base.replace(/\s+/g, '').replace(/([\d.])[eE]-(\d)/g, '$1e+$2')
+  return expr.includes('-') && !wholeGuardCall(expr)
+}
+
 const files = sources('src')
 
 describe('GLSL undefined-behaviour lint', () => {
@@ -50,12 +67,21 @@ describe('GLSL undefined-behaviour lint', () => {
     expect(files.flatMap(shaders).length).toBeGreaterThan(10)
   })
 
+  it('recognises the risky spellings, not just the spaced one', () => {
+    for (const base of ['1.0 - vAlong', '1.0-vAlong', '1.0 -vAlong', '-x', 'max(x, 0.0) - 0.1', 'abs(a) - b']) {
+      expect(riskyBase(base), base).toBe(true)
+    }
+    for (const base of ['max(1.0 - vAlong, 0.0)', 'clamp(1.0-d,0.0,1.0)', 'facing', '1.0e-3 * x', 'abs(a - b)']) {
+      expect(riskyBase(base), base).toBe(false)
+    }
+  })
+
   it('never takes pow() of a difference that can dip below zero', () => {
     const bad: string[] = []
     for (const file of files) {
       for (const src of shaders(file)) {
         for (const [base] of calls(src, 'pow')) {
-          if (/\s-\s|^-/.test(base) && !GUARDED.test(base)) bad.push(`${file}: pow(${base}, …)`)
+          if (riskyBase(base)) bad.push(`${file}: pow(${base}, …)`)
         }
       }
     }
