@@ -7,3 +7,5 @@ qa-shots
 .superpowers/
 assets-src/
 __pycache__/
+# Style frames are reference renders for art direction, never shipped.
+docs/style-frames/*.png
