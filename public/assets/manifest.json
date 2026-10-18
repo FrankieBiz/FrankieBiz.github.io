@@ -66,6 +66,47 @@
           "width": 1024
         }
       }
+    },
+    {
+      "id": "grade-lut",
+      "kind": "lut",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/grade.cube",
+          "bytes": 117999
+        },
+        "medium": {
+          "url": "assets/grade.cube",
+          "bytes": 117999
+        },
+        "low": {
+          "url": "assets/grade.cube",
+          "bytes": 117999
+        }
+      }
+    },
+    {
+      "id": "lens-dirt",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/lens-dirt-high.webp",
+          "bytes": 32446,
+          "width": 2048
+        },
+        "medium": {
+          "url": "assets/lens-dirt-medium.webp",
+          "bytes": 17930,
+          "width": 1024
+        },
+        "low": {
+          "url": "assets/lens-dirt-low.webp",
+          "bytes": 17930,
+          "width": 1024
+        }
+      }
     }
   ]
 }

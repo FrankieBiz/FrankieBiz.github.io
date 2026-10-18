@@ -22,6 +22,7 @@ import { Scroll } from './core/Scroll'
 import { layoutActs, type ActId } from './director/acts'
 import { createState, warpIntensity } from './director/state'
 import { buildTimeline, computeBeats, keyTimes } from './director/timeline'
+import { gradeAssets } from './post/Grade'
 import { PostFX } from './post/PostFX'
 import { World } from './scene/World'
 import { Cursor } from './ui/Cursor'
@@ -221,7 +222,7 @@ async function boot() {
     loader.progress = 0.7
     await nextFrame()
 
-    post = new PostFX(renderer.gl, world.scene, world.rig.camera, quality.budget)
+    post = new PostFX(renderer.gl, world.scene, world.rig.camera, quality.budget, gradeAssets(loaded.ok ? loaded.assets : new Map()))
     const r = renderer
     const w = world
     const p = post
