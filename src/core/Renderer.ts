@@ -1,10 +1,10 @@
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace, WebGLRenderer } from 'three'
+import { DprGovernor } from './dpr'
 import type { QualityBudget } from './Quality'
 
 /**
- * WebGL renderer with a DPR cap and simple dynamic resolution: if frames run
- * long for a sustained period the pixel ratio steps down, and recovers when
- * there is headroom again.
+ * WebGL renderer with a DPR cap and dynamic resolution (DprGovernor): the pixel
+ * ratio steps down while frames run slow and recovers after sustained headroom.
  */
 export class Renderer {
   readonly gl: WebGLRenderer
@@ -12,7 +12,7 @@ export class Renderer {
   height = innerHeight
   pixelRatio: number
   private budget: QualityBudget
-  private frameTimes: number[] = []
+  private governor: DprGovernor
   private listeners: Array<(w: number, h: number, dpr: number) => void> = []
 
   constructor(canvas: HTMLCanvasElement, budget: QualityBudget) {
@@ -34,6 +34,7 @@ export class Renderer {
     this.gl.shadowMap.type = PCFShadowMap
     if (budget.transmission > 0) this.gl.transmissionResolutionScale = budget.transmission
     this.pixelRatio = Math.min(devicePixelRatio, budget.dprCap)
+    this.governor = this.createGovernor()
     this.gl.setPixelRatio(this.pixelRatio)
     this.gl.setSize(this.width, this.height, false)
     addEventListener('resize', this.handleResize)
@@ -46,24 +47,24 @@ export class Renderer {
 
   /** Feed the last frame duration (seconds). */
   adapt(dt: number) {
-    this.frameTimes.push(dt)
-    if (this.frameTimes.length < 90) return
-    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length
-    this.frameTimes.length = 0
+    const next = this.governor.sample(dt)
+    if (next === null) return
+    this.pixelRatio = next
+    this.applySize()
+  }
+
+  /** Ratio range for this display: up to its devicePixelRatio (capped by tier). */
+  private createGovernor() {
     const max = Math.min(devicePixelRatio, this.budget.dprCap)
-    let next = this.pixelRatio
-    if (avg > 1 / 45) next = Math.max(this.budget.dprMin, this.pixelRatio - 0.15)
-    else if (avg < 1 / 58 && this.pixelRatio < max) next = Math.min(max, this.pixelRatio + 0.1)
-    if (Math.abs(next - this.pixelRatio) > 0.01) {
-      this.pixelRatio = next
-      this.applySize()
-    }
+    return new DprGovernor(this.pixelRatio, { min: Math.min(this.budget.dprMin, max), max })
   }
 
   private handleResize = () => {
     this.width = innerWidth
     this.height = innerHeight
     this.pixelRatio = Math.min(this.pixelRatio, devicePixelRatio, this.budget.dprCap)
+    // The window may have moved to a display with a different pixel ratio.
+    this.governor = this.createGovernor()
     this.applySize()
   }
 
