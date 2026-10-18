@@ -280,6 +280,65 @@ check('no console errors during the session', problems.length === 0, [...new Set
   await ctx.close()
 }
 
+/** A fresh page on its own context, booted to the ready state. */
+const boot = async (url, options = {}) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, ...options })
+  const p = await ctx.newPage()
+  await p.goto(url, { waitUntil: 'domcontentloaded' })
+  const ready = await p
+    .waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 120000 })
+    .then(() => true)
+    .catch(() => false)
+  return { ctx, p, ready }
+}
+const renderedFrames = (p, n) =>
+  p.evaluate((count) => new Promise((res) => { let i = 0; const step = () => (++i >= count ? res() : requestAnimationFrame(step)); requestAnimationFrame(step) }), n)
+
+// ------------------------------------- reduced motion → no depth of field, no shimmer
+{
+  const { ctx, p, ready } = await boot(`${base}?debug&quality=high`, { reducedMotion: 'reduce' })
+  let detail = `ready=${ready}`
+  let ok = ready
+  if (ready) {
+    await p.evaluate(() => window.__mission.scroll.jumpTo(2.6)) // manifesto close-up: the deepest focus pull
+    await renderedFrames(p, 6)
+    const dof = await p.evaluate(() => window.__mission.post.dofPass !== null)
+    await p.evaluate(() => window.__mission.scroll.jumpTo(4.6)) // ignition: where the shimmer would run
+    await renderedFrames(p, 6)
+    const heat = await p.evaluate(() => window.__mission.post.lens.uniforms.get('uHeat').value)
+    ok = !dof && heat === 0
+    detail = `depth-of-field pass=${dof} shimmer=${heat}`
+  }
+  check('reduced motion → no depth of field, no heat shimmer', ok, detail)
+  await ctx.close()
+}
+
+// ---------------------------------- lost WebGL context → reload, resume where you were
+{
+  const { ctx, p, ready } = await boot(`${base}?debug&quality=low`)
+  let detail = `ready=${ready}`
+  let ok = ready
+  if (ready) {
+    await p.evaluate(() => window.__mission.scroll.jumpTo(8.6))
+    await renderedFrames(p, 4)
+    const reloaded = p.waitForEvent('load', { timeout: 120000 }).then(() => true).catch(() => false)
+    await p.evaluate(() => {
+      const ext = window.__mission.renderer.gl.getContext().getExtension('WEBGL_lose_context')
+      ext.loseContext()
+      setTimeout(() => ext.restoreContext(), 300)
+    })
+    const back = (await reloaded) && (await p
+      .waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 120000 })
+      .then(() => true)
+      .catch(() => false))
+    const at = back ? await p.evaluate(() => window.__mission.scroll.vu) : NaN
+    ok = back && Math.abs(at - 8.6) < 0.6
+    detail = `reloaded=${back} vu after=${Number.isNaN(at) ? 'n/a' : at.toFixed(2)} (was 8.60)`
+  }
+  check('lost WebGL context → reloads and resumes in place', ok, detail)
+  await ctx.close()
+}
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
 await browser.close()
