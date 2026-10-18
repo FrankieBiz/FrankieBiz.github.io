@@ -1,7 +1,6 @@
 // Performance QA on the real GPU (not SwiftShader): fps, p95 frame time and the
 // adaptive DPR each tier settles at, per checkpoint.
-// Usage: node scripts/qa-perf.mjs [baseUrl] [--tiers=high,medium,low] [--dpr=1.5] [--seconds=4] [--uncapped]
-// --uncapped lifts the 60 Hz frame cap so fps shows real frame cost (headroom), not vsync.
+// Usage: node scripts/qa-perf.mjs [baseUrl] [--tiers=high,medium,low] [--dpr=1.5] [--seconds=4]
 import { chromium } from 'playwright'
 
 const args = process.argv.slice(2)
@@ -9,7 +8,6 @@ const base = args.find((a) => a.startsWith('http')) ?? 'http://localhost:5173/'
 const tiers = (args.find((a) => a.startsWith('--tiers='))?.slice(8) ?? 'high,medium,low').split(',')
 const dpr = Number(args.find((a) => a.startsWith('--dpr='))?.slice(6) ?? 1.5)
 const seconds = Number(args.find((a) => a.startsWith('--seconds='))?.slice(10) ?? 4)
-const uncapped = args.includes('--uncapped')
 const checkpoints = [
   ['pad', 0],
   ['ignition', 4.6],
@@ -18,9 +16,7 @@ const checkpoints = [
   ['contact', 13.8],
 ]
 
-const browser = await chromium.launch({
-  args: ['--enable-gpu', '--ignore-gpu-blocklist', ...(uncapped ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [])],
-})
+const browser = await chromium.launch({ args: ['--enable-gpu', '--ignore-gpu-blocklist'] })
 const rows = []
 for (const tier of tiers) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: dpr })
