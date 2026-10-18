@@ -8,6 +8,7 @@ import './styles/loader.css'
 import './styles/sections.css'
 
 import gsap from 'gsap'
+import { Vector2 } from 'three'
 import { loadAssets } from './assets/load'
 import { EMPTY_MANIFEST, selectTier, validateManifest, type AssetManifest } from './assets/manifest'
 import { MAX_PROJECTS, projects as allProjects, validateProjects } from './content/projects'
@@ -21,6 +22,7 @@ import { Scroll } from './core/Scroll'
 import { layoutActs, type ActId } from './director/acts'
 import { createState, warpIntensity } from './director/state'
 import { buildTimeline, computeBeats, keyTimes } from './director/timeline'
+import { heatIntensity, shaftsEnabled } from './post/gates'
 import { gradeAssets } from './post/Grade'
 import { PostFX } from './post/PostFX'
 import { World } from './scene/World'
@@ -229,6 +231,7 @@ async function boot() {
       grade: gradeAssets(loaded.ok ? loaded.assets : new Map()),
       AOPass,
       depthOfField: !reduced,
+      shaftSource: world.exhaust.shaftSource,
     })
     const r = renderer
     const w = world
@@ -275,6 +278,8 @@ async function boot() {
 
   // ------------------------------------------------------------- loop
   const veil = document.querySelector<HTMLElement>('.veil')!
+  const heatA = new Vector2()
+  const heatB = new Vector2()
   const intro = { amount: reduced ? 0 : 1 }
   const debug = new URLSearchParams(location.search).has('debug') ? createDebugOverlay() : null
   if (debug) Object.assign(window, { __mission: { scroll, state, timeline, layout, world } })
@@ -289,6 +294,12 @@ async function boot() {
     renderer.gl.info.reset()
 
     post.setFocus(world.rig.focusPoint, state.dofAmount)
+    const orbit = world.current === 'orbit'
+    const tier = quality.budget.tier
+    const heat = heatIntensity({ ignition: state.ignition, orbit, reduced, tier })
+    post.lens.setHeat(heat > 0 && world.flameScreenSegment(heatA, heatB) ? heat : 0, heatA, heatB)
+    // Shafts need smoke to scatter off: full in the pad plume, faint once the camera tracks the climb.
+    post.setShafts(shaftsEnabled({ ignition: state.ignition, orbit, tier }), state.ignition * (1 - state.follow * 0.85))
     const warp = warpIntensity(state.warp)
     post.lens.amount = reduced ? 0 : Math.max(intro.amount, warp)
     veil.style.opacity = reduced ? String(warp) : '0'

@@ -7,10 +7,12 @@ import {
   DoubleSide,
   Group,
   Mesh,
+  MeshBasicMaterial,
   NormalBlending,
   PointLight,
   Points,
   ShaderMaterial,
+  SphereGeometry,
   Vector3,
   type Texture,
 } from 'three'
@@ -43,6 +45,8 @@ export class Exhaust {
   /** Add to the pad world (world-space particles). */
   readonly world = new Group()
   readonly light: PointLight
+  /** Light-shaft source: a small hot core inside the flame (transparent, no depth write). */
+  readonly shaftSource: Mesh
   private outer: ShaderMaterial
   private core: ShaderMaterial
   private smoke: ShaderMaterial
@@ -84,6 +88,12 @@ export class Exhaust {
     core.frustumCulled = false
     this.flame.add(core)
     this.flame.visible = false
+    this.shaftSource = new Mesh(
+      new SphereGeometry(0.24, 16, 12),
+      new MeshBasicMaterial({ color: new Color(3.6, 2.5, 1.4), transparent: true, depthWrite: false }),
+    )
+    this.shaftSource.position.y = -0.55
+    this.flame.add(this.shaftSource)
 
     const common = {
       uTime: { value: 0 },

@@ -4,6 +4,8 @@ import {
   DepthOfFieldEffect,
   EffectComposer,
   EffectPass,
+  GodRaysEffect,
+  KernelSize,
   LUT3DEffect,
   NoiseEffect,
   RenderPass,
@@ -14,7 +16,7 @@ import {
   type Effect,
 } from 'postprocessing'
 import type { N8AOPostPass } from 'n8ao'
-import { Color, HalfFloatType, Vector3, type Camera, type Scene, type WebGLRenderer } from 'three'
+import { Color, HalfFloatType, Vector3, type Camera, type Mesh, type Scene, type WebGLRenderer } from 'three'
 import type { QualityBudget } from '../core/Quality'
 import { LensDirtEffect, StreakPass, type GradeAssets } from './Grade'
 import { LensEffect } from './LensEffect'
@@ -31,6 +33,8 @@ export interface PostFXOptions {
   AOPass?: typeof N8AOPostPass
   /** Focus pulls (off under reduced motion). */
   depthOfField?: boolean
+  /** Engine light-shaft source (transparent, no depth write); shafts are off without it. */
+  shaftSource?: Mesh
 }
 
 export class PostFX {
@@ -41,6 +45,8 @@ export class PostFX {
   private dof: DepthOfFieldEffect | null = null
   private dofPass: EffectPass | null = null
   private maxBokeh: number
+  private shafts: GodRaysEffect | null = null
+  private shaftPass: EffectPass | null = null
   private bloomPass: EffectPass
   private finishPass: EffectPass
   private aaPass: EffectPass | null = null
@@ -74,6 +80,24 @@ export class PostFX {
       this.dofPass = new EffectPass(camera, this.dof)
       this.dofPass.enabled = false
       this.composer.addPass(this.dofPass)
+    }
+
+    // Engine light shafts: their own pass so it costs nothing while the engine is off.
+    if (options.shaftSource && budget.tier !== 'low') {
+      this.shafts = new GodRaysEffect(camera, options.shaftSource, {
+        samples: budget.tier === 'high' ? 48 : 32,
+        density: 0.95,
+        decay: 0.93,
+        weight: 0.3,
+        exposure: 0.36,
+        clampMax: 1,
+        resolutionScale: 0.5,
+        kernelSize: KernelSize.SMALL,
+        blur: true,
+      })
+      this.shaftPass = new EffectPass(camera, this.shafts)
+      this.shaftPass.enabled = false
+      this.composer.addPass(this.shaftPass)
     }
 
     const tone = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC })
@@ -111,6 +135,13 @@ export class PostFX {
     }
   }
 
+  /** Turn the engine light shafts on/off and scale them with thrust. */
+  setShafts(enabled: boolean, strength: number) {
+    if (!this.shafts || !this.shaftPass) return
+    this.shaftPass.enabled = enabled
+    this.shafts.blendMode.opacity.value = Math.min(strength, 1) * 0.85
+  }
+
   /** Autofocus on `point` with blur strength `amount` (0..1); the pass sleeps at 0. */
   setFocus(point: Vector3, amount: number) {
     if (!this.dof || !this.dofPass) return
@@ -123,6 +154,7 @@ export class PostFX {
   setCamera(camera: Camera) {
     this.renderPass.mainCamera = camera
     if (this.dofPass) this.dofPass.mainCamera = camera
+    if (this.shaftPass) this.shaftPass.mainCamera = camera
     this.bloomPass.mainCamera = camera
     this.finishPass.mainCamera = camera
     if (this.aaPass) this.aaPass.mainCamera = camera

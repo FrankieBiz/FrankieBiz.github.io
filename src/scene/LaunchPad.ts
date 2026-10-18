@@ -401,7 +401,10 @@ void main() {
   float n = texture2D(uNoise, vWorld.xy * 0.06 + vec2(uTime * 0.01, -uTime * 0.012)).r;
   n *= texture2D(uNoise, vWorld.zy * 0.05 + vec2(-uTime * 0.008, uTime * 0.01)).g * 2.0;
   float dust = 0.55 + 0.45 * n;
-  float a = soft * falloff * dust * 0.075 * uIntensity;
+  // Fade before the hull and the ground so intersections never draw hard lines.
+  float nearRocket = smoothstep(0.8, 3.2, length(vWorld.xz));
+  float nearGround = smoothstep(0.0, 1.4, vWorld.y);
+  float a = soft * falloff * dust * 0.075 * uIntensity * nearRocket * nearGround;
   gl_FragColor = vec4(uColor * a * 3.0, a);
 }
 `

@@ -1,5 +1,5 @@
 import { BlendFunction, Effect, EffectAttribute } from 'postprocessing'
-import { Uniform } from 'three'
+import { Uniform, Vector2 } from 'three'
 
 /**
  * Lens + transition in one pass: radial chromatic aberration that is always
@@ -12,6 +12,9 @@ uniform float uAmount;
 uniform float uTime;
 uniform float uAberration;
 uniform float uAspect;
+uniform float uHeat;
+uniform vec2 uHeatA;
+uniform vec2 uHeatB;
 
 float lnHash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -26,7 +29,24 @@ float lnNoise(vec2 p) {
   return mix(mix(lnHash(i), lnHash(i + vec2(1.0, 0.0)), u.x), mix(lnHash(i + vec2(0.0, 1.0)), lnHash(i + vec2(1.0, 1.0)), u.x), u.y);
 }
 
+// Heat shimmer: refractive wobble inside a widening capsule from nozzle (A) to plume tail (B).
+vec2 heatHaze(vec2 uv) {
+  vec2 asp = vec2(uAspect, 1.0);
+  vec2 pa = (uv - uHeatA) * asp;
+  vec2 ba = (uHeatB - uHeatA) * asp;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+  float dist = length(pa - ba * h);
+  float width = mix(0.035, 0.13, h);
+  float mask = (1.0 - smoothstep(0.0, width, dist)) * uHeat * (1.0 - h * 0.4);
+  vec2 n = vec2(
+    lnNoise(uv * vec2(42.0, 18.0) + vec2(0.0, -uTime * 3.2)),
+    lnNoise(uv * vec2(36.0, 24.0) + vec2(5.0, -uTime * 2.7))
+  ) - 0.5;
+  return uv + n * mask * 0.006;
+}
+
 vec2 distort(vec2 uv) {
+  if (uHeat > 0.001) uv = heatHaze(uv);
   if (uAmount < 0.001) return uv;
   float rows = mix(16.0, 96.0, uAmount);
   float row = floor(uv.y * rows);
@@ -71,6 +91,9 @@ export class LensEffect extends Effect {
         ['uTime', new Uniform(0)],
         ['uAberration', new Uniform(0.0055)],
         ['uAspect', new Uniform(1)],
+        ['uHeat', new Uniform(0)],
+        ['uHeatA', new Uniform(new Vector2())],
+        ['uHeatB', new Uniform(new Vector2())],
       ]),
     })
   }
@@ -85,6 +108,13 @@ export class LensEffect extends Effect {
 
   set time(v: number) {
     this.uniforms.get('uTime')!.value = v
+  }
+
+  /** Heat shimmer strength and the plume's screen-space segment (nozzle → tail, in UV). */
+  setHeat(intensity: number, a: Vector2, b: Vector2) {
+    this.uniforms.get('uHeat')!.value = intensity
+    ;(this.uniforms.get('uHeatA')!.value as Vector2).copy(a)
+    ;(this.uniforms.get('uHeatB')!.value as Vector2).copy(b)
   }
 
   set aspect(v: number) {

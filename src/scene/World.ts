@@ -86,6 +86,8 @@ export class World {
   private fogColor = new Color()
   private follow = new Vector3()
   private nozzle = new Vector3()
+  private tail = new Vector3()
+  private down = new Vector3()
   private raycaster = new Raycaster()
   private ndc = new Vector2()
   private fieldPlane = new Plane(new Vector3(0, 0, 1), 0)
@@ -207,6 +209,22 @@ export class World {
       this.field.update(dt, time, state.assemble, this.pointerOnField(pointer))
     }
     this.sky.update(time, cam.position, orbit ? 1 : state.sky, orbit)
+  }
+
+  /**
+   * The flame's screen-space segment (nozzle → ~7 units down the plume) in UV.
+   * Returns false when the nozzle is behind the camera.
+   */
+  flameScreenSegment(a: Vector2, b: Vector2): boolean {
+    const cam = this.rig.camera
+    this.down.set(0, -1, 0).applyQuaternion(this.rocket.group.quaternion)
+    this.tail.copy(this.nozzle).addScaledVector(this.down, 7)
+    const pa = this.nozzle.clone().project(cam)
+    const pb = this.tail.clone().project(cam)
+    if (pa.z > 1 || pb.z > 1) return false
+    a.set(pa.x * 0.5 + 0.5, pa.y * 0.5 + 0.5)
+    b.set(pb.x * 0.5 + 0.5, pb.y * 0.5 + 0.5)
+    return true
   }
 
   private pointerOnField(pointer: Pointer): Vector3 | null {
