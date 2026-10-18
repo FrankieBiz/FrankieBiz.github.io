@@ -107,6 +107,47 @@
           "width": 1024
         }
       }
+    },
+    {
+      "id": "rocket",
+      "kind": "gltf",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/rocket-high.glb",
+          "bytes": 162640
+        },
+        "medium": {
+          "url": "assets/rocket-medium.glb",
+          "bytes": 162640
+        },
+        "low": {
+          "url": "assets/rocket-low.glb",
+          "bytes": 162640
+        }
+      }
+    },
+    {
+      "id": "rocket-ao",
+      "kind": "texture",
+      "required": false,
+      "tiers": {
+        "high": {
+          "url": "assets/rocket-ao-high.webp",
+          "bytes": 33608,
+          "width": 2048
+        },
+        "medium": {
+          "url": "assets/rocket-ao-medium.webp",
+          "bytes": 7696,
+          "width": 1024
+        },
+        "low": {
+          "url": "assets/rocket-ao-low.webp",
+          "bytes": 7696,
+          "width": 1024
+        }
+      }
     }
   ]
 }

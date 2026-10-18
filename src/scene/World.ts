@@ -8,6 +8,7 @@ import {
   Group,
   HemisphereLight,
   Mesh,
+  Object3D,
   MeshBasicMaterial,
   PlaneGeometry,
   PMREMGenerator,
@@ -34,6 +35,7 @@ import { Payloads } from './Payloads'
 import { Planet } from './Planet'
 import { planetTextures } from './planetTextures'
 import { Rocket } from './Rocket'
+import { RocketModel, type RocketLike } from './RocketModel'
 import { Sky, SUN_DIR } from './Sky'
 import { createNoiseTexture } from './bake'
 import { createHullTextures, createPadTexture, createPuffTexture } from './textures'
@@ -70,7 +72,7 @@ export class World {
   readonly rig: CameraRig
   readonly pad = new Group()
   readonly orbit = new Group()
-  readonly rocket: Rocket
+  readonly rocket: RocketLike
   readonly launchPad: LaunchPad
   readonly exhaust: Exhaust
   readonly sky: Sky
@@ -120,7 +122,11 @@ export class World {
     this.scene.environment = this.envPad
 
     // Shared rocket.
-    this.rocket = new Rocket(createHullTextures(), budget.shadows)
+    // The Blender-authored rocket when it loaded; the procedural one otherwise.
+    const paint = createHullTextures()
+    const authored = assets.get('rocket') as { scene: Object3D } | undefined
+    const hullAo = (assets.get('rocket-ao') as Texture | undefined) ?? null
+    this.rocket = (authored && RocketModel.fromGltf(authored, paint, hullAo, budget.shadows)) || new Rocket(paint, budget.shadows)
     this.scene.add(this.rocket.group)
 
     // Pad world.
